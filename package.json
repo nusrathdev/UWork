@@ -9,7 +9,8 @@
     "start": "remix-serve ./build/server/index.js",
     "typecheck": "tsc",
     "db:push": "prisma db push",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "postinstall": "[ ! -f .env ] && cp .env.example .env || true"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
