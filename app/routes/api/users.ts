@@ -1,12 +1,12 @@
-import { json, LoaderFunction } from 'remix';
-import { getUsers } from '~/models/user.server';
+import { json, type LoaderFunctionArgs } from '@remix-run/node';
+import { getUsers } from '~/utils/db.server';
 
-export const loader: LoaderFunction = async () => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {
   const users = await getUsers();
   return json(users);
 };
 
-export const action: LoaderFunction = async ({ request }) => {
+export const action = async ({ request }: LoaderFunctionArgs) => {
   const formData = new URLSearchParams(await request.text());
   const userData = {
     name: formData.get('name'),

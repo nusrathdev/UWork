@@ -8,77 +8,97 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String
-  studentId String   @unique
-  university String
-  course    String
-  year      Int
-  skills    String   // JSON string of skills array
-  bio       String?
-  avatar    String?
-  rating    Float    @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  projects      Project[]
-  applications  Application[]
-  reviews       Review[]
-  givenReviews  Review[] @relation("ReviewGiver")
-  
-  @@map("users")
+  id                      String        @id @default(cuid())
+  email                   String        @unique
+  password                String
+  name                    String
+  studentId               String        @unique
+  university              String
+  course                  String
+  year                    Int
+  bio                     String?
+  skills                  String
+  rating                  Float         @default(0)
+  reviewCount             Int           @default(0)
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+  projects                Project[]
+  applications            Application[] @relation("FreelancerApplications")
+  givenReviews            Review[]      @relation("ReviewGiver")
+  receivedReviews         Review[]      @relation("ReviewReceiver")
+  sentMessages            Message[]
 }
 
 model Project {
-  id          String   @id @default(cuid())
-  title       String
-  description String
-  budget      Float
-  deadline    DateTime
-  skills      String   // JSON string of skills array
-  status      String   @default("OPEN") // OPEN, IN_PROGRESS, COMPLETED, CANCELLED
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  ownerId     String
-  owner       User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  
-  applications Application[]
-  
-  @@map("projects")
+  id            String        @id @default(cuid())
+  title         String
+  description   String
+  budget        Float
+  deadline      DateTime
+  skills        String
+  status        ProjectStatus @default(OPEN)
+  ownerId       String
+  owner         User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  applications  Application[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 }
 
 model Application {
-  id        String   @id @default(cuid())
-  message   String
+  id             String            @id @default(cuid())
+  projectId      String
+  project        Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  freelancerId   String
+  freelancer     User              @relation("FreelancerApplications", fields: [freelancerId], references: [id], onDelete: Cascade)
+  coverMessage   String
   proposedBudget Float
-  status    String   @default("PENDING") // PENDING, ACCEPTED, REJECTED
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  projectId String
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  userId    String
-  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@unique([projectId, userId])
-  @@map("applications")
+  status         ApplicationStatus @default(PENDING)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  chat           Chat?
 }
 
 model Review {
-  id        String   @id @default(cuid())
-  rating    Int      // 1-5 stars
-  comment   String?
-  createdAt DateTime @default(now())
-  
-  revieweeId String
-  reviewee   User   @relation(fields: [revieweeId], references: [id], onDelete: Cascade)
-  
-  reviewerId String
-  reviewer   User   @relation("ReviewGiver", fields: [reviewerId], references: [id], onDelete: Cascade)
-  
-  @@map("reviews")
+  id           String @id @default(cuid())
+  rating       Int
+  comment      String
+  giverId      String
+  giver        User   @relation("ReviewGiver", fields: [giverId], references: [id], onDelete: Cascade)
+  receiverId   String
+  receiver     User   @relation("ReviewReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+}
+
+model Chat {
+  id            String      @id @default(cuid())
+  applicationId String      @unique
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  messages      Message[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Message {
+  id        String    @id @default(cuid())
+  chatId    String
+  chat      Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User      @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime  @default(now())
+  readAt    DateTime?
+}
+
+enum ProjectStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
 }

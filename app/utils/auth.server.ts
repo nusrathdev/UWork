@@ -103,12 +103,40 @@ export async function createUser(email: string, password: string, userData: any)
   });
 }
 
+export function validateEmail(email: string): string | null {
+  if (!email) return "Email is required";
+  if (typeof email !== "string") return "Email must be a string";
+  if (email.length < 3) return "Email must be at least 3 characters long";
+  if (!email.includes("@")) return "Email must be a valid email address";
+  return null;
+}
+
+export function validatePassword(password: string): string | null {
+  if (!password) return "Password is required";
+  if (typeof password !== "string") return "Password must be a string";
+  if (password.length < 6) return "Password must be at least 6 characters long";
+  return null;
+}
+
 export async function verifyLogin(email: string, password: string) {
+  console.log("verifyLogin called with email:", email);
+  
   const userWithPassword = await db.user.findUnique({
     where: { email },
   });
 
-  if (!userWithPassword || !await bcrypt.compare(password, userWithPassword.password)) {
+  console.log("User found in database:", !!userWithPassword);
+
+  if (!userWithPassword) {
+    console.log("No user found with email:", email);
+    return null;
+  }
+
+  const passwordMatch = await bcrypt.compare(password, userWithPassword.password);
+  console.log("Password match:", passwordMatch);
+
+  if (!passwordMatch) {
+    console.log("Password does not match for user:", email);
     return null;
   }
 

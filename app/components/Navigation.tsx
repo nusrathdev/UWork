@@ -53,11 +53,19 @@ export default function Navigation({ user }: NavigationProps) {
                   className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
                 >
                   {user.name}
-                </Link>
-                <Form method="post" action="/auth/logout">
+                </Link>                <Form method="post" action="/auth/clear-session">
                   <button
                     type="submit"
                     className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
+                    onClick={(e) => {
+                      // Backup method: clear localStorage and redirect
+                      try {
+                        localStorage.clear();
+                        sessionStorage.clear();
+                      } catch (err) {
+                        console.log("Storage clear failed:", err);
+                      }
+                    }}
                   >
                     Logout
                   </button>

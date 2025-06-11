@@ -1,490 +1,352 @@
-import type { ActionFunction, LoaderFunction } from "@remix-run/node";
+import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json, redirect } from "@remix-run/node";
-import { useLoaderData, Form, useActionData, Link } from "@remix-run/react";
-import { requireUserId, getUserId } from "~/utils/auth.server";
-import { db } from "~/utils/db.server";
+import { useLoaderData, Link, Form, useActionData, useNavigation } from "@remix-run/react";
+import { prisma } from "~/utils/db.server";
+import { getUserSession } from "~/utils/auth.server";
+import Navigation from "~/components/Navigation";
 
-interface LoaderData {
-  project: {
-    id: string;
-    title: string;
-    description: string;
-    budget: number;
-    deadline: string;
-    skills: string[];
-    status: string;
-    createdAt: string;
-    owner: {
-      id: string;
-      name: string;
-      university: string;
-      course: string;
-      year: number;
-      rating: number;
-    };
-    applications: Array<{
-      id: string;
-      message: string;
-      proposedBudget: number;
-      status: string;
-      createdAt: string;
-      user: {
-        id: string;
-        name: string;
-        university: string;
-        course: string;
-        year: number;
-        rating: number;
-      };
-    }>;
-  };
-  currentUserId: string | null;
-  userApplication: {
-    id: string;
-    status: string;
-    proposedBudget: number;
-  } | null;
-}
+export async function loader({ params, request }: LoaderFunctionArgs) {
+  try {
+    const session = await getUserSession(request);
+    const userId = session.get("userId");
 
-interface ActionData {
-  errors?: {
-    message?: string;
-    proposedBudget?: string;
-  };
-  success?: boolean;
-}
-
-export const loader: LoaderFunction = async ({ request, params }) => {
-  const projectId = params.id;
-  if (!projectId) {
-    throw new Response("Project not found", { status: 404 });
-  }
-
-  const currentUserId = await getUserId(request);
-
-  const project = await db.project.findUnique({
-    where: { id: projectId },
-    include: {
-      owner: {
+    // Get user data if logged in
+    let user = null;
+    if (userId && typeof userId === "string") {
+      user = await prisma.user.findUnique({
+        where: { id: userId },
         select: {
           id: true,
           name: true,
-          university: true,
-          course: true,
-          year: true,
-          rating: true,
+          email: true,
         },
-      },
-      applications: {
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              university: true,
-              course: true,
-              year: true,
-              rating: true,
+      });
+    }
+
+    // Get the project with all related data
+    const project = await prisma.project.findUnique({
+      where: { id: params.id },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        applications: {
+          include: {
+            freelancer: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                rating: true,
+              },
             },
           },
-        },
-        orderBy: {
-          createdAt: "desc",
+          orderBy: { createdAt: "desc" },
         },
       },
-    },
-  });
+    });
 
-  if (!project) {
-    throw new Response("Project not found", { status: 404 });
+    if (!project) {
+      throw new Response("Project not found", { status: 404 });
+    }
+
+    console.log("Project loader - project found:", project.title);
+
+    return json({ project, user });
+  } catch (error) {
+    console.error("Project detail loader error:", error);
+    throw error;
   }
+}
 
-  const userApplication = currentUserId
-    ? await db.application.findUnique({
-        where: {
-          projectId_userId: {
-            projectId,
-            userId: currentUserId,
-          },
-        },
-        select: {
-          id: true,
-          status: true,
-          proposedBudget: true,
-        },
-      })
-    : null;
+export async function action({ params, request }: LoaderFunctionArgs) {
+  const session = await getUserSession(request);
+  const userId = session.get("userId");
 
-  return json<LoaderData>({
-    project: {
-      ...project,
-      skills: Array.isArray(project.skills)
-        ? project.skills
-        : typeof project.skills === "string"
-        ? project.skills.split(",").map((s) => s.trim()).filter(Boolean)
-        : [],
-      deadline: project.deadline instanceof Date ? project.deadline.toISOString() : project.deadline,
-      createdAt: project.createdAt instanceof Date ? project.createdAt.toISOString() : project.createdAt,
-      applications: project.applications.map((application) => ({
-        ...application,
-        createdAt: application.createdAt instanceof Date ? application.createdAt.toISOString() : application.createdAt,
-      })),
-    },
-    currentUserId,
-    userApplication,
-  });
-};
-
-export const action: ActionFunction = async ({ request, params }) => {
-  const userId = await requireUserId(request);
-  const projectId = params.id;
-  
-  if (!projectId) {
-    throw new Response("Project not found", { status: 404 });
+  if (!userId || typeof userId !== "string") {
+    return redirect("/auth/login");
   }
-
   const formData = await request.formData();
   const intent = formData.get("intent");
 
   if (intent === "apply") {
-    const message = formData.get("message");
-    const proposedBudget = formData.get("proposedBudget");
+    const coverMessage = formData.get("coverMessage")?.toString();
+    const proposedBudget = formData.get("proposedBudget")?.toString();
 
-    const errors: ActionData["errors"] = {};
-
-    if (!message || typeof message !== "string") {
-      errors.message = "Message is required";
-    } else if (message.length < 20) {
-      errors.message = "Message must be at least 20 characters";
+    if (!coverMessage || !proposedBudget) {
+      return json({ error: "Cover message and proposed budget are required" }, { status: 400 });
     }
 
-    if (!proposedBudget || typeof proposedBudget !== "string") {
-      errors.proposedBudget = "Proposed budget is required";
-    } else if (isNaN(Number(proposedBudget)) || Number(proposedBudget) <= 0) {
-      errors.proposedBudget = "Proposed budget must be a positive number";
-    }
-
-    if (Object.keys(errors).length > 0) {
-      return json<ActionData>({ errors }, { status: 400 });
-    }
-
-    // Check if user already applied
-    const existingApplication = await db.application.findUnique({
-      where: {
-        projectId_userId: {
-          projectId,
-          userId,
+    try {
+      // Check if user already applied
+      const existingApplication = await prisma.application.findFirst({
+        where: {
+          projectId: params.id,
+          freelancerId: userId,
         },
-      },
-    });
-
-    if (existingApplication) {
-      return json<ActionData>(
-        { errors: { message: "You have already applied to this project" } },
-        { status: 400 }
-      );
-    }
-
-    // Check if user is the project owner
-    const project = await db.project.findUnique({
-      where: { id: projectId },
-      select: { ownerId: true },
-    });
-
-    if (project?.ownerId === userId) {
-      return json<ActionData>(
-        { errors: { message: "You cannot apply to your own project" } },
-        { status: 400 }
-      );
-    }
-
-    await db.application.create({
-      data: {
-        projectId,
-        userId,
-        message: message as string,
-        proposedBudget: Number(proposedBudget),
-      },
-    });
-
-    return json<ActionData>({ success: true });
-  }
-
-  if (intent === "accept" || intent === "reject") {
-    const applicationId = formData.get("applicationId");
-    if (!applicationId || typeof applicationId !== "string") {
-      throw new Response("Invalid application", { status: 400 });
-    }
-
-    // Verify user owns the project
-    const application = await db.application.findUnique({
-      where: { id: applicationId },
-      include: {
-        project: {
-          select: { ownerId: true },
-        },
-      },
-    });
-
-    if (!application || application.project.ownerId !== userId) {
-      throw new Response("Unauthorized", { status: 403 });
-    }
-
-    await db.application.update({
-      where: { id: applicationId },
-      data: {
-        status: intent === "accept" ? "ACCEPTED" : "REJECTED",
-      },
-    });
-
-    if (intent === "accept") {
-      // Update project status to IN_PROGRESS
-      await db.project.update({
-        where: { id: projectId },
-        data: { status: "IN_PROGRESS" },
       });
-    }
 
-    return redirect(`/projects/${projectId}`);
+      if (existingApplication) {
+        return json({ error: "You have already applied to this project" }, { status: 400 });
+      }
+
+      // Create application
+      await prisma.application.create({
+        data: {
+          projectId: params.id!,
+          freelancerId: userId,
+          coverMessage,
+          proposedBudget: parseFloat(proposedBudget),
+          status: "PENDING",
+        },
+      });
+
+      return json({ success: "Application submitted successfully!" });
+    } catch (error) {
+      console.error("Error creating application:", error);
+      return json({ error: "Failed to submit application" }, { status: 500 });
+    }
   }
 
-  throw new Response("Invalid action", { status: 400 });
-};
+  return json({ error: "Invalid action" }, { status: 400 });
+}
 
 export default function ProjectDetail() {
-  const { project, currentUserId, userApplication } = useLoaderData<LoaderData>();
-  const actionData = useActionData<ActionData>();
+  const { project, user } = useLoaderData<typeof loader>();
+  const actionData = useActionData<typeof action>();
+  const navigation = useNavigation();
+  const isSubmitting = navigation.state === "submitting";
 
-  const isOwner = currentUserId === project.owner.id;
-  const canApply = currentUserId && !isOwner && !userApplication && project.status === "OPEN";
+  // Check if current user is the project owner
+  const isOwner = user && user.id === project.owner.id;
+
+  // Check if current user has already applied
+  const hasApplied = user && project.applications.some(app => app.freelancer.id === user.id);
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="bg-white shadow rounded-lg">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <div className="flex justify-between items-start">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">{project.title}</h1>
-              <div className="mt-2 flex items-center space-x-4 text-sm text-gray-500">
-                <span>Posted by {project.owner.name}</span>
-                <span>•</span>
-                <span>{project.owner.university}</span>
-                <span>•</span>
-                <span>{new Date(project.createdAt).toLocaleDateString()}</span>
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-2xl font-bold text-green-600">${project.budget}</div>
-              <div className="text-sm text-gray-500">
-                Deadline: {new Date(project.deadline).toLocaleDateString()}
-              </div>
-              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                project.status === 'OPEN' ? 'bg-green-100 text-green-800' :
-                project.status === 'IN_PROGRESS' ? 'bg-yellow-100 text-yellow-800' :
-                project.status === 'COMPLETED' ? 'bg-blue-100 text-blue-800' :
-                'bg-gray-100 text-gray-800'
-              }`}>
-                {project.status}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-6">
-          <div className="mb-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-3">Project Description</h2>
-            <p className="text-gray-700 whitespace-pre-wrap">{project.description}</p>
-          </div>
-
-          <div className="mb-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-3">Required Skills</h3>
-            <div className="flex flex-wrap gap-2">
-              {project.skills.map((skill) => (
-                <span
-                  key={skill}
-                  className="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full"
-                >
-                  {skill}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div className="mb-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-3">Project Owner</h3>
-            <div className="flex items-center space-x-4">
-              <div className="flex-shrink-0">
-                <div className="h-12 w-12 rounded-full bg-blue-500 flex items-center justify-center">
-                  <span className="text-white font-semibold">
-                    {project.owner.name.charAt(0).toUpperCase()}
-                  </span>
-                </div>
-              </div>
+    <div className="min-h-screen bg-gray-50">
+      <Navigation user={user} />
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="bg-white rounded-lg shadow-sm p-8">
+          {/* Project Header */}
+          <div className="border-b border-gray-200 pb-6 mb-6">
+            <div className="flex justify-between items-start">
               <div>
-                <p className="text-sm font-medium text-gray-900">{project.owner.name}</p>
-                <p className="text-sm text-gray-500">
-                  {project.owner.course}, Year {project.owner.year}
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                  {project.title}
+                </h1>
+                <p className="text-lg font-semibold text-green-600">
+                  Budget: ${project.budget}
                 </p>
-                <p className="text-sm text-gray-500">{project.owner.university}</p>
-                <div className="flex items-center">
-                  <span className="text-yellow-400">★</span>
-                  <span className="text-sm text-gray-600 ml-1">
-                    {project.owner.rating.toFixed(1)} rating
-                  </span>
-                </div>
+                <p className="text-sm text-gray-500 mt-1">
+                  Posted by: {project.owner.name}
+                </p>
+                <p className="text-sm text-gray-500">
+                  Deadline: {new Date(project.deadline).toLocaleDateString()}
+                </p>
+              </div>
+              <div className="text-right">
+                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                  project.status === 'OPEN' ? 'bg-green-100 text-green-800' :
+                  project.status === 'IN_PROGRESS' ? 'bg-yellow-100 text-yellow-800' :
+                  project.status === 'COMPLETED' ? 'bg-blue-100 text-blue-800' :
+                  'bg-gray-100 text-gray-800'
+                }`}>
+                  {project.status}
+                </span>
+                <p className="text-sm text-gray-500 mt-2">
+                  {project.applications.length} applications
+                </p>
               </div>
             </div>
           </div>
 
-          {/* Application Form */}
-          {canApply && (
-            <div className="border-t pt-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Apply for this Project</h3>
-              <Form method="post" className="space-y-4">
-                <input type="hidden" name="intent" value="apply" />
-                <div>
-                  <label htmlFor="message" className="block text-sm font-medium text-gray-700">
-                    Cover Message
-                  </label>
-                  <textarea
-                    id="message"
-                    name="message"
-                    rows={4}
-                    required
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    placeholder="Explain why you're the right fit for this project..."
-                  />
-                  <p className="mt-1 text-sm text-gray-500">Minimum 20 characters</p>
-                  {actionData?.errors?.message && (
-                    <div className="text-red-500 text-sm mt-1">{actionData.errors.message}</div>
-                  )}
-                </div>
+          {/* Project Description */}
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Description</h2>
+            <div className="prose max-w-none">
+              <p className="text-gray-700 whitespace-pre-wrap">{project.description}</p>
+            </div>
+          </div>
 
-                <div>
-                  <label htmlFor="proposedBudget" className="block text-sm font-medium text-gray-700">
-                    Your Proposed Budget ($)
-                  </label>
-                  <input
-                    type="number"
-                    id="proposedBudget"
-                    name="proposedBudget"
-                    min="1"
-                    step="0.01"
-                    required
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    placeholder={project.budget.toString()}
-                  />
-                  {actionData?.errors?.proposedBudget && (
-                    <div className="text-red-500 text-sm mt-1">{actionData.errors.proposedBudget}</div>
-                  )}
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium"
-                >
-                  Submit Application
-                </button>
-              </Form>
-
-              {actionData?.success && (
-                <div className="mt-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
-                  Your application has been submitted successfully!
-                </div>
-              )}
+          {/* Skills Required */}
+          {project.skills && (
+            <div className="mb-8">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Skills Required</h2>              <div className="flex flex-wrap gap-2">
+                {(() => {
+                  try {
+                    // Try to parse as JSON array first
+                    const skills = JSON.parse(project.skills);
+                    return skills.map((skill: string, index: number) => (
+                      <span
+                        key={index}
+                        className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
+                      >
+                        {skill.trim()}
+                      </span>
+                    ));
+                  } catch {
+                    // Fallback to comma-separated string
+                    return project.skills.split(',').map((skill, index) => (
+                      <span
+                        key={index}
+                        className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
+                      >
+                        {skill.trim()}
+                      </span>
+                    ));
+                  }
+                })()}
+              </div>
             </div>
           )}
 
-          {/* User's Application Status */}
-          {userApplication && (
-            <div className="border-t pt-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Your Application</h3>
-              <div className="bg-gray-50 p-4 rounded-md">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-sm text-gray-600">
-                      Your proposed budget: <span className="font-medium">${userApplication.proposedBudget}</span>
-                    </p>
-                  </div>
-                  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                    userApplication.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-                    userApplication.status === 'ACCEPTED' ? 'bg-green-100 text-green-800' :
-                    'bg-red-100 text-red-800'
-                  }`}>
-                    {userApplication.status}
-                  </span>
-                </div>
+          {/* Action Messages */}
+          {actionData && "error" in actionData && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
+              <p className="text-red-800">{actionData.error}</p>
+            </div>
+          )}
+
+          {actionData && "success" in actionData && (
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-md">
+              <p className="text-green-800">{actionData.success}</p>
+            </div>
+          )}
+
+          {/* Application Form or Status */}
+          {user ? (
+            isOwner ? (
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-6">
+                <h3 className="text-lg font-semibold text-blue-900 mb-2">This is your project</h3>
+                <p className="text-blue-700 mb-4">You can manage applications and project status.</p>
+                <Link
+                  to={`/dashboard/projects/${project.id}/manage`}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Manage Project
+                </Link>
               </div>
+            ) : hasApplied ? (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-6">
+                <h3 className="text-lg font-semibold text-yellow-900 mb-2">Application Submitted</h3>
+                <p className="text-yellow-700">You have already applied to this project. Please wait for the project owner to review your application.</p>
+              </div>
+            ) : project.status === 'OPEN' ? (
+              <div className="bg-white border border-gray-200 rounded-md p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Apply for this Project</h3>
+                <Form method="post" className="space-y-4">
+                  <input type="hidden" name="intent" value="apply" />
+                  
+                  <div>
+                    <label htmlFor="coverMessage" className="block text-sm font-medium text-gray-700 mb-1">
+                      Cover Message
+                    </label>
+                    <textarea
+                      id="coverMessage"
+                      name="coverMessage"
+                      required
+                      rows={4}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Tell the project owner why you're the right person for this job..."
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="proposedBudget" className="block text-sm font-medium text-gray-700 mb-1">
+                      Your Proposed Budget ($)
+                    </label>
+                    <input
+                      type="number"
+                      id="proposedBudget"
+                      name="proposedBudget"
+                      required
+                      min="1"
+                      step="0.01"
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Enter your budget"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full bg-blue-600 text-white px-4 py-2 rounded-md font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSubmitting ? "Submitting..." : "Submit Application"}
+                  </button>
+                </Form>
+              </div>
+            ) : (
+              <div className="bg-gray-50 border border-gray-200 rounded-md p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Project Not Available</h3>
+                <p className="text-gray-700">This project is no longer accepting applications.</p>
+              </div>
+            )
+          ) : (
+            <div className="bg-gray-50 border border-gray-200 rounded-md p-6 text-center">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Login Required</h3>
+              <p className="text-gray-700 mb-4">Please log in to apply for this project.</p>
+              <Link
+                to="/auth/login"
+                className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Login
+              </Link>
             </div>
           )}
 
           {/* Applications (for project owner) */}
           {isOwner && project.applications.length > 0 && (
-            <div className="border-t pt-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Applications ({project.applications.length})
-              </h3>
+            <div className="mt-8 border-t border-gray-200 pt-8">
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">Applications ({project.applications.length})</h2>
               <div className="space-y-4">
                 {project.applications.map((application) => (
                   <div key={application.id} className="border border-gray-200 rounded-md p-4">
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex items-center space-x-3">
-                        <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
-                          <span className="text-white font-semibold">
-                            {application.user.name.charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{application.user.name}</p>
-                          <p className="text-sm text-gray-500">
-                            {application.user.course}, Year {application.user.year}
-                          </p>
-                          <p className="text-sm text-gray-500">{application.user.university}</p>
-                        </div>
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-900">{application.freelancer.name}</h4>
+                        <p className="text-sm text-gray-600">{application.freelancer.email}</p>
+                        <p className="text-sm text-gray-500">
+                          ★ {application.freelancer.rating?.toFixed(1) || '0.0'} rating
+                        </p>
+                        <p className="text-sm font-medium text-green-600 mt-1">
+                          Proposed Budget: ${application.proposedBudget}
+                        </p>
+                        <p className="text-gray-700 mt-2">{application.coverMessage}</p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium">${application.proposedBudget}</p>
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                          application.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-                          application.status === 'ACCEPTED' ? 'bg-green-100 text-green-800' :
-                          'bg-red-100 text-red-800'
+                      <div className="ml-4">
+                        <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                          application.status === 'APPROVED' ? 'bg-green-100 text-green-800' :
+                          application.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
+                          'bg-yellow-100 text-yellow-800'
                         }`}>
                           {application.status}
                         </span>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {new Date(application.createdAt).toLocaleDateString()}
+                        </p>
                       </div>
                     </div>
-
-                    <p className="text-sm text-gray-700 mb-3">{application.message}</p>
-
-                    {application.status === 'PENDING' && project.status === 'OPEN' && (
-                      <div className="flex space-x-2">
-                        <Form method="post" className="inline">
-                          <input type="hidden" name="intent" value="accept" />
-                          <input type="hidden" name="applicationId" value={application.id} />
-                          <button
-                            type="submit"
-                            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm"
-                          >
-                            Accept
-                          </button>
-                        </Form>
-                        <Form method="post" className="inline">
-                          <input type="hidden" name="intent" value="reject" />
-                          <input type="hidden" name="applicationId" value={application.id} />
-                          <button
-                            type="submit"
-                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm"
-                          >
-                            Reject
-                          </button>
-                        </Form>
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
             </div>
           )}
+
+          {/* Back to Projects */}
+          <div className="mt-8 pt-6 border-t border-gray-200">
+            <Link
+              to="/projects"
+              className="text-blue-600 hover:text-blue-700 font-medium"
+            >
+              ← Back to Projects
+            </Link>
+          </div>
         </div>
       </div>
     </div>

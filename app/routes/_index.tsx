@@ -1,7 +1,14 @@
-import React from 'react';
-import { Link } from '@remix-run/react';
+import type { MetaFunction } from "@remix-run/node";
+import { Link } from "@remix-run/react";
 
-const Index = () => {
+export const meta: MetaFunction = () => {
+  return [
+    { title: "StudentFreelance - Connect with fellow students" },
+    { name: "description", content: "A platform for students to find and offer freelance services" },
+  ];
+};
+
+export default function Index() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-16">
@@ -30,6 +37,4 @@ const Index = () => {
       </div>
     </div>
   );
-};
-
-export default Index;
+}
