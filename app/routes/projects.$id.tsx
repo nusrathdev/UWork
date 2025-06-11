@@ -1,9 +1,12 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json, redirect } from "@remix-run/node";
 import { useLoaderData, Link, Form, useActionData, useNavigation } from "@remix-run/react";
+import { useState } from "react";
 import { prisma } from "~/utils/db.server";
 import { getUserSession } from "~/utils/auth.server";
 import Navigation from "~/components/Navigation";
+import { ChatBox } from "~/components/ChatBox";
+import { ChatButton } from "~/components/ChatButton";
 
 export async function loader({ params, request }: LoaderFunctionArgs) {
   try {
@@ -33,8 +36,7 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
             name: true,
             email: true,
           },
-        },
-        applications: {
+        },        applications: {
           include: {
             freelancer: {
               select: {
@@ -42,6 +44,25 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
                 name: true,
                 email: true,
                 rating: true,
+              },
+            },            chat: {
+              include: {
+                messages: {
+                  select: {
+                    id: true,
+                    content: true,
+                    senderId: true,
+                    createdAt: true,
+                    sender: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                      },
+                    },
+                  },
+                  orderBy: { createdAt: "asc" },
+                },
               },
             },
           },
@@ -103,12 +124,54 @@ export async function action({ params, request }: LoaderFunctionArgs) {
           proposedBudget: parseFloat(proposedBudget),
           status: "PENDING",
         },
-      });
-
-      return json({ success: "Application submitted successfully!" });
+      });      return json({ success: "Application submitted successfully!" });
     } catch (error) {
       console.error("Error creating application:", error);
       return json({ error: "Failed to submit application" }, { status: 500 });
+    }
+  }
+
+  if (intent === "approve" || intent === "reject") {
+    const applicationId = formData.get("applicationId")?.toString();
+    
+    if (!applicationId) {
+      return json({ error: "Application ID is required" }, { status: 400 });
+    }
+
+    try {
+      // Check if user is the project owner
+      const project = await prisma.project.findUnique({
+        where: { id: params.id },
+        select: { ownerId: true },
+      });
+
+      if (!project || project.ownerId !== userId) {
+        return json({ error: "You are not authorized to perform this action" }, { status: 403 });
+      }
+
+      // Update application status
+      const updatedApplication = await prisma.application.update({
+        where: { id: applicationId },
+        data: { status: intent === "approve" ? "APPROVED" : "REJECTED" },
+      });
+
+      // If approved, create a chat for the application
+      if (intent === "approve") {
+        await prisma.chat.create({
+          data: {
+            applicationId: applicationId,
+          },
+        });
+      }
+
+      return json({ 
+        success: intent === "approve" 
+          ? "Application approved! You can now chat with the freelancer." 
+          : "Application rejected successfully." 
+      });
+    } catch (error) {
+      console.error("Error updating application:", error);
+      return json({ error: "Failed to update application" }, { status: 500 });
     }
   }
 
@@ -120,6 +183,7 @@ export default function ProjectDetail() {
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
+  const [openChatId, setOpenChatId] = useState<string | null>(null);
 
   // Check if current user is the project owner
   const isOwner = user && user.id === project.owner.id;
@@ -304,8 +368,7 @@ export default function ProjectDetail() {
           {isOwner && project.applications.length > 0 && (
             <div className="mt-8 border-t border-gray-200 pt-8">
               <h2 className="text-xl font-semibold text-gray-900 mb-6">Applications ({project.applications.length})</h2>
-              <div className="space-y-4">
-                {project.applications.map((application) => (
+              <div className="space-y-4">                {project.applications.map((application) => (
                   <div key={application.id} className="border border-gray-200 rounded-md p-4">
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
@@ -319,7 +382,7 @@ export default function ProjectDetail() {
                         </p>
                         <p className="text-gray-700 mt-2">{application.coverMessage}</p>
                       </div>
-                      <div className="ml-4">
+                      <div className="ml-4 flex flex-col items-end space-y-2">
                         <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
                           application.status === 'APPROVED' ? 'bg-green-100 text-green-800' :
                           application.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
@@ -327,9 +390,45 @@ export default function ProjectDetail() {
                         }`}>
                           {application.status}
                         </span>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-gray-500">
                           {new Date(application.createdAt).toLocaleDateString()}
                         </p>
+                        
+                        {/* Action buttons for pending applications */}
+                        {application.status === 'PENDING' && (
+                          <div className="flex space-x-2 mt-2">
+                            <Form method="post" className="inline">
+                              <input type="hidden" name="intent" value="approve" />
+                              <input type="hidden" name="applicationId" value={application.id} />
+                              <button
+                                type="submit"
+                                disabled={isSubmitting}
+                                className="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700 disabled:opacity-50"
+                              >
+                                Accept
+                              </button>
+                            </Form>
+                            <Form method="post" className="inline">
+                              <input type="hidden" name="intent" value="reject" />
+                              <input type="hidden" name="applicationId" value={application.id} />
+                              <button
+                                type="submit"
+                                disabled={isSubmitting}
+                                className="bg-red-600 text-white px-3 py-1 rounded text-xs hover:bg-red-700 disabled:opacity-50"
+                              >
+                                Reject
+                              </button>
+                            </Form>
+                          </div>
+                        )}
+
+                        {/* Chat button for approved applications */}
+                        {application.status === 'APPROVED' && application.chat && (
+                          <ChatButton
+                            onClick={() => setOpenChatId(application.id)}
+                            hasUnreadMessages={false}
+                          />
+                        )}
                       </div>
                     </div>
                   </div>
@@ -338,8 +437,7 @@ export default function ProjectDetail() {
             </div>
           )}
 
-          {/* Back to Projects */}
-          <div className="mt-8 pt-6 border-t border-gray-200">
+          {/* Back to Projects */}          <div className="mt-8 pt-6 border-t border-gray-200">
             <Link
               to="/projects"
               className="text-blue-600 hover:text-blue-700 font-medium"
@@ -349,6 +447,29 @@ export default function ProjectDetail() {
           </div>
         </div>
       </div>
+
+      {/* Chat Box */}
+      {openChatId && (() => {
+        // Find the application for the opened chat
+        const application = project.applications.find((app: any) => app.id === openChatId);
+        
+        if (!application || !application.chat) return null;
+
+        // Determine the other user name
+        const otherUserName = isOwner ? application.freelancer.name : project.owner.name;
+        
+        return (
+          <ChatBox
+            messages={application.chat.messages || []} 
+            currentUserId={user!.id}
+            applicationId={openChatId}
+            isOpen={true}
+            onClose={() => setOpenChatId(null)}
+            projectTitle={project.title}
+            otherUserName={otherUserName}
+          />
+        );
+      })()}
     </div>
   );
 }
