@@ -3,7 +3,6 @@ import { json } from '@remix-run/node';
 import { useLoaderData, Link } from '@remix-run/react';
 import { prisma } from '~/utils/db.server';
 import { getUserSession } from "~/utils/auth.server";
-import Navigation from "~/components/Navigation";
 import ProjectCard from '~/components/ProjectCard';
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -59,10 +58,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export default function ProjectsIndex() {
   const { projects, user } = useLoaderData<typeof loader>();
-
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation user={user} />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white rounded-lg shadow-sm p-8">
           <div className="flex justify-between items-center mb-6">

@@ -25,9 +25,8 @@ export function ChatBox({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const submit = useSubmit();
   const navigation = useNavigation();
-  
-  const isSubmitting = navigation.state === "submitting" && 
-    navigation.formData?.get("action") === "sendMessage";
+    const isSubmitting = navigation.state === "submitting" && 
+    navigation.formData?.get("intent") === "send";
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -36,17 +35,16 @@ export function ChatBox({
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || isSubmitting) return;
 
     const formData = new FormData();
-    formData.append('action', 'sendMessage');
+    formData.append('intent', 'send');
     formData.append('applicationId', applicationId);
     formData.append('content', newMessage);
 
-    submit(formData, { method: 'post' });
+    submit(formData, { method: 'post', action: '/api/chat' });
     setNewMessage('');
   };
 

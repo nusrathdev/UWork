@@ -1,12 +1,8 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json, redirect } from "@remix-run/node";
-import { useLoaderData, Link, Form, useActionData, useNavigation } from "@remix-run/react";
-import { useState } from "react";
+import { useLoaderData, Link, Form, useActionData, useNavigation, useSearchParams } from "@remix-run/react";
 import { prisma } from "~/utils/db.server";
 import { getUserSession } from "~/utils/auth.server";
-import Navigation from "~/components/Navigation";
-import { ChatBox } from "~/components/ChatBox";
-import { ChatButton } from "~/components/ChatButton";
 
 export async function loader({ params, request }: LoaderFunctionArgs) {
   try {
@@ -130,7 +126,6 @@ export async function action({ params, request }: LoaderFunctionArgs) {
       return json({ error: "Failed to submit application" }, { status: 500 });
     }
   }
-
   if (intent === "approve" || intent === "reject") {
     const applicationId = formData.get("applicationId")?.toString();
     
@@ -147,9 +142,7 @@ export async function action({ params, request }: LoaderFunctionArgs) {
 
       if (!project || project.ownerId !== userId) {
         return json({ error: "You are not authorized to perform this action" }, { status: 403 });
-      }
-
-      // Update application status
+      }      // Update application status
       const updatedApplication = await prisma.application.update({
         where: { id: applicationId },
         data: { status: intent === "approve" ? "APPROVED" : "REJECTED" },
@@ -164,16 +157,17 @@ export async function action({ params, request }: LoaderFunctionArgs) {
         });
       }
 
-      return json({ 
-        success: intent === "approve" 
-          ? "Application approved! You can now chat with the freelancer." 
-          : "Application rejected successfully." 
-      });
+      // Redirect back to the same page to refresh data and show the success message
+      const url = new URL(request.url);
+      url.searchParams.set('success', intent === "approve" ? 'approved' : 'rejected');
+      
+      return redirect(url.toString());
     } catch (error) {
       console.error("Error updating application:", error);
       return json({ error: "Failed to update application" }, { status: 500 });
     }
   }
+
 
   return json({ error: "Invalid action" }, { status: 400 });
 }
@@ -182,22 +176,27 @@ export default function ProjectDetail() {
   const { project, user } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
+  const [searchParams] = useSearchParams();
   const isSubmitting = navigation.state === "submitting";
-  const [openChatId, setOpenChatId] = useState<string | null>(null);
 
+  // Get success message from URL parameters
+  const successParam = searchParams.get('success');
+  const successMessage = successParam === 'approved' 
+    ? "Application approved! You can now chat with the freelancer."
+    : successParam === 'rejected'
+    ? "Application rejected successfully."
+    : null;
   // Check if current user is the project owner
   const isOwner = user && user.id === project.owner.id;
 
-  // Check if current user has already applied
-  const hasApplied = user && project.applications.some(app => app.freelancer.id === user.id);
-
+  // Check if current user has already applied and get their application
+  const userApplication = user ? project.applications.find(app => app.freelancer.id === user.id) : null;
+  const hasApplied = !!userApplication;
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation user={user} />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white rounded-lg shadow-sm p-8">
-          {/* Project Header */}
-          <div className="border-b border-gray-200 pb-6 mb-6">
+          {/* Project Header */}          <div className="border-b border-gray-200 pb-6 mb-6">
             <div className="flex justify-between items-start">
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -214,17 +213,27 @@ export default function ProjectDetail() {
                 </p>
               </div>
               <div className="text-right">
-                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                  project.status === 'OPEN' ? 'bg-green-100 text-green-800' :
-                  project.status === 'IN_PROGRESS' ? 'bg-yellow-100 text-yellow-800' :
-                  project.status === 'COMPLETED' ? 'bg-blue-100 text-blue-800' :
-                  'bg-gray-100 text-gray-800'
-                }`}>
-                  {project.status}
-                </span>
-                <p className="text-sm text-gray-500 mt-2">
-                  {project.applications.length} applications
-                </p>
+                <div className="flex flex-col items-end space-y-2">
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                    project.status === 'OPEN' ? 'bg-green-100 text-green-800' :
+                    project.status === 'IN_PROGRESS' ? 'bg-yellow-100 text-yellow-800' :
+                    project.status === 'COMPLETED' ? 'bg-blue-100 text-blue-800' :
+                    'bg-gray-100 text-gray-800'
+                  }`}>
+                    {project.status}
+                  </span>
+                  <p className="text-sm text-gray-500">
+                    {project.applications.length} applications
+                  </p>
+                  {user && !isOwner && (
+                    <button
+                      onClick={() => window.location.reload()}
+                      className="text-xs text-blue-600 hover:text-blue-700 underline"
+                    >
+                      🔄 Check for Updates
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -267,18 +276,18 @@ export default function ProjectDetail() {
                 })()}
               </div>
             </div>
-          )}
-
-          {/* Action Messages */}
+          )}          {/* Action Messages */}
           {actionData && "error" in actionData && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
               <p className="text-red-800">{actionData.error}</p>
             </div>
           )}
 
-          {actionData && "success" in actionData && (
+          {((actionData && "success" in actionData) || successMessage) && (
             <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-md">
-              <p className="text-green-800">{actionData.success}</p>
+              <p className="text-green-800">
+                {successMessage || (actionData as any)?.success}
+              </p>
             </div>
           )}
 
@@ -294,11 +303,66 @@ export default function ProjectDetail() {
                 >
                   Manage Project
                 </Link>
-              </div>
-            ) : hasApplied ? (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-6">
-                <h3 className="text-lg font-semibold text-yellow-900 mb-2">Application Submitted</h3>
-                <p className="text-yellow-700">You have already applied to this project. Please wait for the project owner to review your application.</p>
+              </div>            ) : hasApplied ? (
+              <div className={`border rounded-md p-6 ${
+                userApplication?.status === 'APPROVED' ? 'bg-green-50 border-green-200' :
+                userApplication?.status === 'REJECTED' ? 'bg-red-50 border-red-200' :
+                'bg-yellow-50 border-yellow-200'
+              }`}>
+                <h3 className={`text-lg font-semibold mb-2 ${
+                  userApplication?.status === 'APPROVED' ? 'text-green-900' :
+                  userApplication?.status === 'REJECTED' ? 'text-red-900' :
+                  'text-yellow-900'
+                }`}>
+                  Application Status: {userApplication?.status || 'PENDING'}
+                </h3>
+                
+                {userApplication?.status === 'APPROVED' ? (
+                  <div>
+                    <p className="text-green-700 mb-4">
+                      🎉 Congratulations! Your application has been approved. You can now start chatting with the project owner.
+                    </p>
+                    <div className="flex space-x-3">
+                      <Link
+                        to={`/chat/${userApplication.id}`}
+                        className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                      >
+                        <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
+                        </svg>
+                        Start Chat
+                      </Link>
+                      <Link
+                        to="/dashboard"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                      >
+                        Go to Dashboard
+                      </Link>
+                    </div>
+                  </div>
+                ) : userApplication?.status === 'REJECTED' ? (
+                  <div>
+                    <p className="text-red-700 mb-4">
+                      Unfortunately, your application was not accepted for this project. Don't give up - there are many other opportunities available!
+                    </p>
+                    <Link
+                      to="/projects"
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                    >
+                      Browse Other Projects
+                    </Link>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-yellow-700 mb-4">
+                      Your application is under review. Please wait for the project owner to review your application.
+                    </p>
+                    <div className="text-sm text-gray-600 mt-2">
+                      <p><strong>Your Proposal:</strong> ${userApplication?.proposedBudget}</p>
+                      <p><strong>Applied:</strong> {userApplication?.createdAt ? new Date(userApplication.createdAt).toLocaleDateString() : 'Unknown'}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : project.status === 'OPEN' ? (
               <div className="bg-white border border-gray-200 rounded-md p-6">
@@ -389,9 +453,13 @@ export default function ProjectDetail() {
                           'bg-yellow-100 text-yellow-800'
                         }`}>
                           {application.status}
-                        </span>
-                        <p className="text-xs text-gray-500">
-                          {new Date(application.createdAt).toLocaleDateString()}
+                        </span>                        <p className="text-xs text-gray-500">
+                          Applied: {new Date(application.createdAt).toLocaleDateString()}
+                          {application.updatedAt && application.updatedAt !== application.createdAt && (
+                            <span className="block">
+                              Updated: {new Date(application.updatedAt).toLocaleDateString()} at {new Date(application.updatedAt).toLocaleTimeString()}
+                            </span>
+                          )}
                         </p>
                         
                         {/* Action buttons for pending applications */}
@@ -420,14 +488,17 @@ export default function ProjectDetail() {
                               </button>
                             </Form>
                           </div>
-                        )}
-
-                        {/* Chat button for approved applications */}
-                        {application.status === 'APPROVED' && application.chat && (
-                          <ChatButton
-                            onClick={() => setOpenChatId(application.id)}
-                            hasUnreadMessages={false}
-                          />
+                        )}                        {/* Chat button for approved applications */}
+                        {application.status === 'APPROVED' && (
+                          <Link
+                            to={`/chat/${application.id}`}
+                            className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-xs"
+                          >
+                            <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
+                            </svg>
+                            Chat
+                          </Link>
                         )}
                       </div>
                     </div>
@@ -435,9 +506,7 @@ export default function ProjectDetail() {
                 ))}
               </div>
             </div>
-          )}
-
-          {/* Back to Projects */}          <div className="mt-8 pt-6 border-t border-gray-200">
+          )}          {/* Back to Projects */}          <div className="mt-8 pt-6 border-t border-gray-200">
             <Link
               to="/projects"
               className="text-blue-600 hover:text-blue-700 font-medium"
@@ -447,29 +516,6 @@ export default function ProjectDetail() {
           </div>
         </div>
       </div>
-
-      {/* Chat Box */}
-      {openChatId && (() => {
-        // Find the application for the opened chat
-        const application = project.applications.find((app: any) => app.id === openChatId);
-        
-        if (!application || !application.chat) return null;
-
-        // Determine the other user name
-        const otherUserName = isOwner ? application.freelancer.name : project.owner.name;
-        
-        return (
-          <ChatBox
-            messages={application.chat.messages || []} 
-            currentUserId={user!.id}
-            applicationId={openChatId}
-            isOpen={true}
-            onClose={() => setOpenChatId(null)}
-            projectTitle={project.title}
-            otherUserName={otherUserName}
-          />
-        );
-      })()}
     </div>
   );
 }

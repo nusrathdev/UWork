@@ -3,7 +3,6 @@ import { json, redirect } from "@remix-run/node";
 import { useLoaderData, Form, useActionData, useNavigation } from "@remix-run/react";
 import { prisma } from "~/utils/db.server";
 import { getUserSession } from "~/utils/auth.server";
-import Navigation from "~/components/Navigation";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const session = await getUserSession(request);
@@ -71,10 +70,8 @@ export default function NewProject() {
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
-
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation user={user} />
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white rounded-lg shadow-sm p-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-6">
