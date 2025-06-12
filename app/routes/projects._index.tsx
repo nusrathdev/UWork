@@ -1,287 +1,242 @@
-import type { LoaderFunction } from "@remix-run/node";
-import { json } from "@remix-run/node";
-import { useLoaderData, Link, Form, useSearchParams } from "@remix-run/react";
-import { getUserId } from "~/utils/auth.server";
-import { db } from "~/utils/db.server";
+import type { LoaderFunctionArgs } from "@remix-run/node";
+import { json } from '@remix-run/node';
+import { useLoaderData, Link } from '@remix-run/react';
+import { prisma } from '~/utils/db.server';
+import { getUserSession } from "~/utils/auth.server";
+import ProjectCard from '~/components/ProjectCard';
 
-interface LoaderData {
-  projects: Array<{
-    id: string;
-    title: string;
-    description: string;
-    budget: number;
-    deadline: string;
-    skills: string[];
-    status: string;
-    createdAt: string;
-    owner: {
-      id: string;
-      name: string;
-      university: string;
-      rating: number;
-    };
-    _count: {
-      applications: number;
-    };
-  }>;
-  currentUserId: string | null;
-}
+export async function loader({ request }: LoaderFunctionArgs) {
+  try {
+    console.log("Projects loader starting...");
+    const session = await getUserSession(request);
+    const userId = session.get("userId");
+    console.log("User ID from session:", userId);
 
-export const loader: LoaderFunction = async ({ request }) => {
-  const url = new URL(request.url);
-  const search = url.searchParams.get("search") || "";
-  const skill = url.searchParams.get("skill") || "";
-  const minBudget = url.searchParams.get("minBudget") || "";
-  const maxBudget = url.searchParams.get("maxBudget") || "";
-
-  const currentUserId = await getUserId(request);
-
-  const whereClause: any = {
-    status: "OPEN",
-  };
-
-  if (search) {
-    whereClause.OR = [
-      { title: { contains: search, mode: "insensitive" } },
-      { description: { contains: search, mode: "insensitive" } },
-    ];
-  }
-
-  if (skill) {
-    whereClause.skills = {
-      has: skill,
-    };
-  }
-
-  if (minBudget && !isNaN(Number(minBudget))) {
-    whereClause.budget = {
-      ...whereClause.budget,
-      gte: Number(minBudget),
-    };
-  }
-
-  if (maxBudget && !isNaN(Number(maxBudget))) {
-    whereClause.budget = {
-      ...whereClause.budget,
-      lte: Number(maxBudget),
-    };
-  }
-
-  const projectsRaw = await db.project.findMany({
-    where: whereClause,
-    include: {
-      owner: {
+    // Get user data if logged in
+    let user = null;
+    if (userId && typeof userId === "string") {
+      user = await prisma.user.findUnique({
+        where: { id: userId },
         select: {
           id: true,
           name: true,
-          university: true,
-          rating: true,
+          email: true,
+        },
+      });
+      console.log("User found:", !!user);
+    }
+
+    // Load all projects with owner information
+    console.log("Loading projects...");
+    const projects = await prisma.project.findMany({
+      include: {
+        owner: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        applications: {
+          select: {
+            id: true,
+          },
         },
       },
-      _count: {
-        select: {
-          applications: true,
-        },
-      },
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+      orderBy: { createdAt: "desc" },
+    });
+    
+    console.log("Projects loaded:", projects.length);
+    console.log("First project:", projects[0]);
 
-  const projects = projectsRaw.map((project) => ({
-    ...project,
-    createdAt: project.createdAt.toISOString(),
-    deadline: project.deadline.toISOString(),
-    skills: Array.isArray(project.skills)
-      ? project.skills
-      : typeof project.skills === "string"
-        ? project.skills.split(",").map((s: string) => s.trim()).filter(Boolean)
-        : [],
-  }));
+    return json({ projects, user });
+  } catch (error) {
+    console.error("Projects loader error:", error);
+    return json({ projects: [], user: null });
+  }
+}
 
-  return json<LoaderData>({
-    projects,
-    currentUserId,
-  });
-};
-
-export default function Projects() {
-  const { projects, currentUserId } = useLoaderData<LoaderData>();
-  const [searchParams] = useSearchParams();
-
-  const commonSkills = [
-    "Web Development",
-    "Mobile Development",
-    "UI/UX Design",
-    "Graphic Design",
-    "Content Writing",
-    "Data Analysis",
-    "Photography",
-    "Video Editing",
-    "Social Media",
-    "Tutoring",
-  ];
-
+export default function ProjectsIndex() {
+  const { projects, user } = useLoaderData<typeof loader>();
+  
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Browse Projects</h1>
-        <p className="mt-2 text-gray-600">Find freelance opportunities from fellow students</p>
-      </div>
-
-      {/* Search and Filters */}
-      <div className="bg-white p-6 rounded-lg shadow mb-8">
-        <Form method="get" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header Section */}
+        <div className="mb-8">
+          <div className="flex justify-between items-center mb-6">
             <div>
-              <label htmlFor="search" className="block text-sm font-medium text-gray-700">
-                Search
-              </label>
-              <input
-                type="text"
-                id="search"
-                name="search"
-                defaultValue={searchParams.get("search") || ""}
-                placeholder="Search projects..."
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="skill" className="block text-sm font-medium text-gray-700">
-                Skill
-              </label>
-              <select
-                id="skill"
-                name="skill"
-                defaultValue={searchParams.get("skill") || ""}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              >
-                <option value="">All Skills</option>
-                {commonSkills.map((skill) => (
-                  <option key={skill} value={skill}>
-                    {skill}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="minBudget" className="block text-sm font-medium text-gray-700">
-                Min Budget
-              </label>
-              <input
-                type="number"
-                id="minBudget"
-                name="minBudget"
-                defaultValue={searchParams.get("minBudget") || ""}
-                placeholder="0"
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="maxBudget" className="block text-sm font-medium text-gray-700">
-                Max Budget
-              </label>
-              <input
-                type="number"
-                id="maxBudget"
-                name="maxBudget"
-                defaultValue={searchParams.get("maxBudget") || ""}
-                placeholder="1000"
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium"
-            >
-              Apply Filters
-            </button>
-          </div>
-        </Form>
-      </div>
-
-      {/* Projects Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {projects.map((project) => (
-          <div key={project.id} className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow">
-            <div className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">
-                  {project.title}
-                </h3>
-                <span className="text-lg font-bold text-green-600">
-                  ${project.budget}
-                </span>
-              </div>
-
-              <p className="text-gray-600 text-sm mb-4 line-clamp-3">
-                {project.description}
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                Find Your Next Project
+              </h1>
+              <p className="text-lg text-gray-600">
+                Discover opportunities that match your skills and interests
               </p>
+            </div>
+            {user && (
+              <Link
+                to="/projects/new"
+                className="inline-flex items-center bg-green-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-green-700 transition-colors shadow-sm"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Post a Job
+              </Link>
+            )}
+          </div>
 
-              <div className="mb-4">
-                <div className="flex flex-wrap gap-2">
-                  {project.skills.slice(0, 3).map((skill) => (
-                    <span
-                      key={skill}
-                      className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
+          {/* Filters Bar */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center space-x-2">
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input 
+                  type="text" 
+                  placeholder="Search projects..." 
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                />
+              </div>
+              <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                <option>All Categories</option>
+                <option>Web Development</option>
+                <option>Mobile Apps</option>
+                <option>Design</option>
+                <option>Writing</option>
+              </select>
+              <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                <option>Any Budget</option>
+                <option>$0 - $500</option>
+                <option>$500 - $1000</option>
+                <option>$1000+</option>
+              </select>
+              <button className="text-green-600 hover:text-green-700 text-sm font-medium">
+                Clear Filters
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {projects.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 max-w-md mx-auto">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">No projects available yet</h3>
+              <p className="text-gray-600 mb-6">
+                Be the first to post a project and start building something amazing!
+              </p>
+              {user && (
+                <Link
+                  to="/projects/new"
+                  className="inline-flex items-center bg-green-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-green-700 transition-colors"
+                >
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  Post the First Project
+                </Link>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {projects.map((project: any) => (
+              <div
+                key={project.id}
+                className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-all duration-200 hover:border-green-200"
+              >
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex-1">
+                    <Link
+                      to={`/projects/${project.id}`}
+                      className="block group"
                     >
-                      {skill}
-                    </span>
-                  ))}
-                  {project.skills.length > 3 && (
-                    <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
-                      +{project.skills.length - 3} more
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex justify-between items-center text-sm text-gray-500 mb-4">
-                <span>Deadline: {new Date(project.deadline).toLocaleDateString()}</span>
-                <span>{project._count.applications} applications</span>
-              </div>
-
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{project.owner.name}</p>
-                  <p className="text-xs text-gray-500">{project.owner.university}</p>
-                  <div className="flex items-center">
-                    <span className="text-yellow-400">★</span>
-                    <span className="text-xs text-gray-600 ml-1">
-                      {project.owner.rating.toFixed(1)}
-                    </span>
+                      <h3 className="text-xl font-semibold text-gray-900 group-hover:text-green-600 transition-colors mb-2">
+                        {project.title}
+                      </h3>
+                    </Link>
+                    <p className="text-gray-600 mb-4 leading-relaxed">
+                      {project.description.length > 200 
+                        ? `${project.description.slice(0, 200)}...` 
+                        : project.description
+                      }
+                    </p>
+                    
+                    {/* Skills Tags */}
+                    {project.skills && (
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {project.skills.split(',').map((skill: string, index: number) => (
+                          <span
+                            key={index}
+                            className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
+                          >
+                            {skill.trim()}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="ml-6 text-right">
+                    <div className="text-2xl font-bold text-green-600 mb-2">
+                      ${project.budget.toLocaleString()}
+                    </div>
+                    <div className="text-sm text-gray-500 mb-4">
+                      Fixed Price
+                    </div>
+                    <Link
+                      to={`/projects/${project.id}`}
+                      className="inline-flex items-center bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                    >
+                      View Details
+                      <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </Link>
                   </div>
                 </div>
-                <Link
-                  to={`/projects/${project.id}`}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-                >
-                  View Details
-                </Link>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
 
-      {projects.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-gray-500 text-lg">No projects found matching your criteria.</p>
-          <Link
-            to="/projects/new"
-            className="mt-4 inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-md font-medium"
-          >
-            Post the First Project
-          </Link>
-        </div>
-      )}
+                <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                  <div className="flex items-center space-x-4 text-sm text-gray-500">
+                    <div className="flex items-center">
+                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      Posted by {project.owner.name}
+                    </div>
+                    <div className="flex items-center">
+                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      {project.applications?.length || 0} proposals
+                    </div>
+                    <div className="flex items-center">
+                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Posted {new Date(project.createdAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <button className="p-2 text-gray-400 hover:text-red-500 transition-colors">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,181 +1,148 @@
-import type { ActionFunction, LoaderFunction } from "@remix-run/node";
+import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { json, redirect } from "@remix-run/node";
-import { Form, useActionData, useNavigation } from "@remix-run/react";
-import { requireUserId } from "~/utils/auth.server";
-import { db } from "~/utils/db.server";
+import { useLoaderData, Form, useActionData, useNavigation } from "@remix-run/react";
+import { prisma } from "~/utils/db.server";
+import { getUserSession } from "~/utils/auth.server";
 
-interface ActionData {
-  errors?: {
-    title?: string;
-    description?: string;
-    budget?: string;
-    deadline?: string;
-    skills?: string;
-  };
-}
+export async function loader({ request }: LoaderFunctionArgs) {
+  const session = await getUserSession(request);
+  const userId = session.get("userId");
 
-export const loader: LoaderFunction = async ({ request }) => {
-  await requireUserId(request);
-  return json({});
-};
-
-export const action: ActionFunction = async ({ request }) => {
-  const userId = await requireUserId(request);
-  const formData = await request.formData();
-  
-  const title = formData.get("title");
-  const description = formData.get("description");
-  const budget = formData.get("budget");
-  const deadline = formData.get("deadline");
-  const skillsString = formData.get("skills");
-
-  const errors: ActionData["errors"] = {};
-
-  if (!title || typeof title !== "string") {
-    errors.title = "Title is required";
+  if (!userId || typeof userId !== "string") {
+    return redirect("/auth/login");
   }
 
-  if (!description || typeof description !== "string") {
-    errors.description = "Description is required";
-  } else if (description.length < 50) {
-    errors.description = "Description must be at least 50 characters";
-  }
-
-  if (!budget || typeof budget !== "string") {
-    errors.budget = "Budget is required";
-  } else if (isNaN(Number(budget)) || Number(budget) <= 0) {
-    errors.budget = "Budget must be a positive number";
-  }
-
-  if (!deadline || typeof deadline !== "string") {
-    errors.deadline = "Deadline is required";
-  } else {
-    const deadlineDate = new Date(deadline);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (deadlineDate <= today) {
-      errors.deadline = "Deadline must be in the future";
-    }
-  }
-
-  if (!skillsString || typeof skillsString !== "string") {
-    errors.skills = "At least one skill is required";
-  }
-
-  if (Object.keys(errors).length > 0) {
-    return json<ActionData>({ errors }, { status: 400 });
-  }
-
-  const skills = typeof skillsString === "string"
-    ? skillsString.split(",").map((skill: string) => skill.trim()).filter((skill: string) => skill.length > 0)
-    : [];
-
-  const project = await db.project.create({
-    data: {
-      title: title as string,
-      description: description as string,
-      budget: Number(budget),
-      deadline: new Date(deadline as string),
-      skills: skills.join(", "),
-      ownerId: userId,
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      name: true,
+      email: true,
     },
   });
 
-  return redirect(`/projects/${project.id}`);
-};
+  if (!user) {
+    return redirect("/auth/login");
+  }
+
+  return json({ user });
+}
+
+export async function action({ request }: ActionFunctionArgs) {
+  const session = await getUserSession(request);
+  const userId = session.get("userId");
+
+  if (!userId || typeof userId !== "string") {
+    return redirect("/auth/login");
+  }
+  const formData = await request.formData();
+  const title = formData.get("title")?.toString();
+  const description = formData.get("description")?.toString();
+  const budget = formData.get("budget")?.toString();
+  const skills = formData.get("skills")?.toString();
+  const deadline = formData.get("deadline")?.toString();
+
+  if (!title || !description || !budget || !deadline) {
+    return json({ error: "All fields are required" }, { status: 400 });
+  }
+
+  try {    const project = await prisma.project.create({
+      data: {
+        title,
+        description,
+        budget: parseFloat(budget),
+        skills: skills || "",
+        deadline: new Date(deadline),
+        ownerId: userId,
+        status: "OPEN",
+      },
+    });
+
+    return redirect(`/projects/${project.id}`);
+  } catch (error) {
+    console.error("Error creating project:", error);
+    return json({ error: "Failed to create project" }, { status: 500 });
+  }
+}
 
 export default function NewProject() {
-  const actionData = useActionData<ActionData>();
+  const { user } = useLoaderData<typeof loader>();
+  const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
-
-  const commonSkills = [
-    "Web Development",
-    "Mobile Development",
-    "UI/UX Design",
-    "Graphic Design",
-    "Content Writing",
-    "Data Analysis",
-    "Photography",
-    "Video Editing",
-    "Social Media",
-    "Tutoring",
-    "Translation",
-    "Research",
-    "Marketing",
-    "Accounting",
-    "Programming",
-  ];
-
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Post a New Project</h1>
-        <p className="mt-2 text-gray-600">
-          Describe your project and connect with talented students
-        </p>
-      </div>
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="bg-white rounded-lg shadow-sm p-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-6">
+            Post a New Project
+          </h1>
 
-      <div className="bg-white shadow rounded-lg">
-        <Form method="post" className="p-6 space-y-6">
-          <div>
-            <label htmlFor="title" className="block text-sm font-medium text-gray-700">
-              Project Title *
-            </label>
-            <input
-              type="text"
-              id="title"
-              name="title"
-              required
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              placeholder="e.g., Build a responsive website for my startup"
-            />
-            {actionData?.errors?.title && (
-              <div className="text-red-500 text-sm mt-1">{actionData.errors.title}</div>
-            )}
-          </div>
+          {actionData?.error && (
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
+              <p className="text-red-800">{actionData.error}</p>
+            </div>
+          )}
 
-          <div>
-            <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-              Project Description *
-            </label>
-            <textarea
-              id="description"
-              name="description"
-              rows={6}
-              required
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              placeholder="Provide a detailed description of your project, requirements, deliverables, and any specific preferences..."
-            />
-            <p className="mt-1 text-sm text-gray-500">Minimum 50 characters</p>
-            {actionData?.errors?.description && (
-              <div className="text-red-500 text-sm mt-1">{actionData.errors.description}</div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Form method="post" className="space-y-6">
             <div>
-              <label htmlFor="budget" className="block text-sm font-medium text-gray-700">
-                Budget ($) *
+              <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
+                Project Title
+              </label>
+              <input
+                type="text"
+                id="title"
+                name="title"
+                required
+                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter your project title"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
+                Project Description
+              </label>
+              <textarea
+                id="description"
+                name="description"
+                required
+                rows={6}
+                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Describe your project in detail..."
+              />
+            </div>
+
+            <div>
+              <label htmlFor="budget" className="block text-sm font-medium text-gray-700 mb-1">
+                Budget ($)
               </label>
               <input
                 type="number"
                 id="budget"
                 name="budget"
+                required
                 min="1"
                 step="0.01"
-                required
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="100"
+                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter your budget"
               />
-              {actionData?.errors?.budget && (
-                <div className="text-red-500 text-sm mt-1">{actionData.errors.budget}</div>
-              )}
+            </div>            <div>
+              <label htmlFor="skills" className="block text-sm font-medium text-gray-700 mb-1">
+                Required Skills (comma-separated)
+              </label>
+              <input
+                type="text"
+                id="skills"
+                name="skills"
+                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="e.g., React, Node.js, Design"
+              />
             </div>
 
             <div>
-              <label htmlFor="deadline" className="block text-sm font-medium text-gray-700">
-                Deadline *
+              <label htmlFor="deadline" className="block text-sm font-medium text-gray-700 mb-1">
+                Project Deadline
               </label>
               <input
                 type="date"
@@ -183,77 +150,28 @@ export default function NewProject() {
                 name="deadline"
                 required
                 min={new Date().toISOString().split('T')[0]}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               />
-              {actionData?.errors?.deadline && (
-                <div className="text-red-500 text-sm mt-1">{actionData.errors.deadline}</div>
-              )}
             </div>
-          </div>
 
-          <div>
-            <label htmlFor="skills" className="block text-sm font-medium text-gray-700">
-              Required Skills *
-            </label>
-            <input
-              type="text"
-              id="skills"
-              name="skills"
-              required
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              placeholder="Web Development, UI/UX Design, JavaScript"
-            />
-            <p className="mt-1 text-sm text-gray-500">
-              Enter skills separated by commas
-            </p>
-            {actionData?.errors?.skills && (
-              <div className="text-red-500 text-sm mt-1">{actionData.errors.skills}</div>
-            )}
-
-            <div className="mt-2">
-              <p className="text-sm font-medium text-gray-700 mb-2">Common Skills:</p>
-              <div className="flex flex-wrap gap-2">
-                {commonSkills.map((skill) => (
-                  <button
-                    key={skill}
-                    type="button"
-                    onClick={() => {
-                      const skillsInput = document.getElementById("skills") as HTMLInputElement;
-                      const currentSkills = skillsInput.value.split(",").map(s => s.trim()).filter(s => s);
-                      if (!currentSkills.includes(skill)) {
-                        skillsInput.value = currentSkills.length > 0 
-                          ? `${currentSkills.join(", ")}, ${skill}`
-                          : skill;
-                      }
-                    }}
-                    className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-full border border-gray-300"
-                  >
-                    + {skill}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t pt-6">
-            <div className="flex justify-end space-x-4">
-              <button
-                type="button"
-                onClick={() => window.history.back()}
-                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Cancel
-              </button>
+            <div className="flex space-x-4">
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-md font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? "Creating..." : "Create Project"}
               </button>
+              <button
+                type="button"
+                onClick={() => window.history.back()}
+                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-md font-medium hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                Cancel
+              </button>
             </div>
-          </div>
-        </Form>
+          </Form>
+        </div>
       </div>
     </div>
   );

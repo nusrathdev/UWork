@@ -16,6 +16,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 export { db };
+export const prisma = db;
 
 export const getUsers = async () => {
   return await db.user.findMany();

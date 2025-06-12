@@ -1,12 +1,12 @@
-import { json, LoaderFunction } from 'remix';
-import { getProjects } from '~/models/project.server';
+import { json, type LoaderFunctionArgs } from '@remix-run/node';
+import { getProjects } from '~/utils/db.server';
 
-export const loader: LoaderFunction = async () => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {
   const projects = await getProjects();
   return json(projects);
 };
 
-export const action: LoaderFunction = async ({ request }) => {
+export const action = async ({ request }: LoaderFunctionArgs) => {
   const formData = new URLSearchParams(await request.text());
   const newProject = {
     title: formData.get('title'),

@@ -12,7 +12,7 @@ import {
 
 import { getUser } from "~/utils/auth.server";
 import Navigation from "~/components/Navigation";
-import stylesheet from "./styles/output.css";
+import stylesheet from "./styles/app.css?url";
 
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: stylesheet },
