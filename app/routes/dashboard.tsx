@@ -136,40 +136,39 @@ export default function Dashboard() {
   }  return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-lg shadow-sm p-8">            <div className="flex justify-between items-center mb-4">
-              <h1 className="text-3xl font-bold text-gray-900">
-                Welcome to Your Dashboard
+        {/* Header Section */}
+        <div className="mb-8">
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                Welcome back, {user.name}!
               </h1>
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => window.location.reload()}
-                  className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Check for Updates
-                </button>
-              </div>
+              <p className="text-lg text-gray-600">
+                Here's what's happening with your freelance work today.
+              </p>
             </div>
-          <p className="text-lg text-gray-600 mb-8">
-            Here you can manage your projects and profile.
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Link
-              to="/dashboard/projects"
-              className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors text-center block"
-            >
-              View Projects
-            </Link>
-            <Link
-              to="/dashboard/profile"
-              className="bg-green-600 text-white px-6 py-3 rounded-lg font-medium hover:green-blue-700 transition-colors text-center block"
-            >
-              Edit Profile
-            </Link>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => window.location.reload()}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh
+              </button>
+              <Link
+                to="/projects/new"
+                className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors shadow-sm"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Post a Job
+              </Link>
+            </div>
           </div>
-        </div>        <div className="mt-8">
+        </div><div className="mt-8">
           {/* Recent Activity Notifications */}
           {(recentlyUpdatedApplications.length > 0 || recentApplicationsToMyProjects.length > 0) && (
             <div className="mb-6 space-y-4">
@@ -229,62 +228,64 @@ export default function Dashboard() {
                 </div>
               )}
             </div>
-          )}
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Profile Summary */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold mb-4">Profile Summary</h2>              <div className="space-y-2">
-                <p><span className="font-medium">University:</span> {user.university || 'Not specified'}</p>
-                <p><span className="font-medium">Skills:</span> {typeof user.skills === 'string' ? JSON.parse(user.skills || '[]').join(', ') : 'No skills listed'}</p>
-                <p><span className="font-medium">Rating:</span> ★ {user.rating?.toFixed(1) || '0.0'} ({user.reviewCount || 0} reviews)</p>
-              </div>
-              <Link
-                to="/dashboard/profile"
-                className="mt-4 inline-block bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-              >
-                Edit Profile
-              </Link>
-            </div>
-
-            {/* Quick Stats */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold mb-4">Quick Stats</h2>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span>Projects Posted:</span>
-                  <span className="font-semibold">{projects.length}</span>
+          )}          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+            {/* Stats Cards */}
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+              <div className="flex items-center">
+                <div className="p-3 rounded-lg bg-blue-50">
+                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
                 </div>
-                <div className="flex justify-between">
-                  <span>Applications Sent:</span>
-                  <span className="font-semibold">{applications.length}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Active Chats:</span>
-                  <span className="font-semibold">{chats.length}</span>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Active Projects</p>
+                  <p className="text-2xl font-bold text-gray-900">{projects.length}</p>
                 </div>
               </div>
             </div>
 
-            {/* Quick Actions */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
-              <div className="space-y-3">
-                <Link
-                  to="/projects/new"
-                  className="block w-full bg-green-600 text-white text-center px-4 py-2 rounded-md hover:bg-green-700"
-                >
-                  Post New Project
-                </Link>
-                <Link
-                  to="/projects"
-                  className="block w-full bg-blue-600 text-white text-center px-4 py-2 rounded-md hover:bg-blue-700"
-                >
-                  Browse Projects
-                </Link>
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+              <div className="flex items-center">
+                <div className="p-3 rounded-lg bg-green-50">
+                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Applications</p>
+                  <p className="text-2xl font-bold text-gray-900">{applications.length}</p>
+                </div>
               </div>
             </div>
-          </div>          {/* Active Chats */}
+
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+              <div className="flex items-center">
+                <div className="p-3 rounded-lg bg-purple-50">
+                  <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Active Chats</p>
+                  <p className="text-2xl font-bold text-gray-900">{chats.length}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+              <div className="flex items-center">
+                <div className="p-3 rounded-lg bg-yellow-50">
+                  <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                  </svg>
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Rating</p>
+                  <p className="text-2xl font-bold text-gray-900">★ {user.rating?.toFixed(1) || '0.0'}</p>
+                </div>
+              </div>
+            </div>
+          </div>{/* Active Chats */}
           {chats.length > 0 && (
             <div className="mt-8 bg-white rounded-lg shadow-md p-6">
               <h2 className="text-xl font-semibold mb-4">Active Chats</h2>

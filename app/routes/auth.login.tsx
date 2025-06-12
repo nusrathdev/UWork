@@ -6,7 +6,7 @@ import { createUserSession, getUserId } from "~/utils/auth.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const userId = await getUserId(request);
-  if (userId) return redirect("/dashboard");
+  if (userId) return redirect("/projects");
   return json({});
 }
 
@@ -31,7 +31,7 @@ export async function action({ request }: ActionFunctionArgs) {
     );
   }
 
-  return createUserSession(user.id, "/dashboard");
+  return createUserSession(user.id, "/projects");
 }
 
 export default function LoginPage() {
