@@ -1,10 +1,12 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json, redirect } from "@remix-run/node";
-import { useLoaderData, Link } from "@remix-run/react";
+import type { ActionFunctionArgs } from "@remix-run/node";
+import { useLoaderData, Link, Form } from "@remix-run/react";
 import { useEffect } from "react";
 import { prisma } from "~/utils/db.server";
 import { getUserSession, logout } from "~/utils/auth.server";
 import { getUserChats } from "~/utils/chat.server";
+import { getUserNotifications, getUnreadNotificationCount } from "~/utils/notifications.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
@@ -15,10 +17,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
       console.log("No userId found, redirecting to login");
       return redirect("/auth/login");
     }    // Load user data with their projects and applications
-    const [user, projects, applications, chats] = await Promise.all([
+    const [user, projects, applications, chats, notifications, unreadCount] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
-      }),      prisma.project.findMany({
+      }),prisma.project.findMany({
         where: { ownerId: userId },
         include: {
           applications: {
@@ -51,9 +53,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
             },
           },
         },
-        orderBy: { createdAt: "desc" },
-      }),
+        orderBy: { createdAt: "desc" },      }),
       getUserChats(userId),
+      getUserNotifications(userId),
+      getUnreadNotificationCount(userId),
     ]);console.log("Dashboard loader - user found:", !!user);    if (!user) {
       console.log("User not found in database - clearing session and redirecting to login");
       // Clear the invalid session and redirect to login
@@ -72,13 +75,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
       project.applications.filter((app: any) => 
         new Date(app.createdAt) > recentCutoff
       )
-    );
-
-    return json({ 
+    );    return json({ 
       user, 
       projects, 
       applications, 
       chats,
+      notifications,
+      unreadCount,
       recentlyUpdatedApplications,
       recentApplicationsToMyProjects
     });
@@ -88,8 +91,40 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 }
 
+export async function action({ request }: ActionFunctionArgs) {
+  const session = await getUserSession(request);
+  const userId = session.get("userId");
+
+  if (!userId || typeof userId !== "string") {
+    return redirect("/auth/login");
+  }
+
+  const formData = await request.formData();
+  const intent = formData.get("intent");
+
+  if (intent === "mark-all-read") {
+    try {
+      // Mark all unread notifications as read
+      await prisma.notification.updateMany({
+        where: { 
+          userId,
+          read: false 
+        },
+        data: { read: true },
+      });
+      
+      return json({ success: true });
+    } catch (error) {
+      console.error("Error marking notifications as read:", error);
+      return json({ error: "Failed to mark notifications as read" }, { status: 500 });
+    }
+  }
+
+  return json({ error: "Invalid action" }, { status: 400 });
+}
+
 export default function Dashboard() {
-  const { user, projects, applications, chats, recentlyUpdatedApplications, recentApplicationsToMyProjects } = useLoaderData<typeof loader>();
+  const { user, projects, applications, chats, notifications, unreadCount, recentlyUpdatedApplications, recentApplicationsToMyProjects } = useLoaderData<typeof loader>();
 
   // Auto-refresh every 2 minutes to check for updates
   useEffect(() => {
@@ -168,7 +203,7 @@ export default function Dashboard() {
               </Link>
             </div>
           </div>
-        </div><div className="mt-8">
+        </div>        <div className="mt-8">
           {/* Recent Activity Notifications */}
           {(recentlyUpdatedApplications.length > 0 || recentApplicationsToMyProjects.length > 0) && (
             <div className="mb-6 space-y-4">

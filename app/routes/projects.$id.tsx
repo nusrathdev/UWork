@@ -3,6 +3,7 @@ import { json, redirect } from "@remix-run/node";
 import { useLoaderData, Link, Form, useActionData, useNavigation, useSearchParams } from "@remix-run/react";
 import { prisma } from "~/utils/db.server";
 import { getUserSession } from "~/utils/auth.server";
+import { createNotification } from "~/utils/notifications.server";
 
 export async function loader({ params, request }: LoaderFunctionArgs) {
   try {
@@ -109,9 +110,7 @@ export async function action({ params, request }: LoaderFunctionArgs) {
 
       if (existingApplication) {
         return json({ error: "You have already applied to this project" }, { status: 400 });
-      }
-
-      // Create application
+      }      // Create application
       await prisma.application.create({
         data: {
           projectId: params.id!,
@@ -120,7 +119,38 @@ export async function action({ params, request }: LoaderFunctionArgs) {
           proposedBudget: parseFloat(proposedBudget),
           status: "PENDING",
         },
-      });      return json({ success: "Application submitted successfully!" });
+      });
+
+      // Get project owner info to create notification
+      const project = await prisma.project.findUnique({
+        where: { id: params.id! },
+        include: {
+          owner: {
+            select: { id: true, name: true }
+          }
+        }
+      });
+
+      // Get freelancer info for notification
+      const freelancer = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { name: true }
+      });
+
+      // Create notification for project owner
+      if (project && freelancer) {
+        await createNotification({
+          userId: project.owner.id,
+          type: "PROJECT_UPDATE",
+          title: "New Application Received!",
+          message: `${freelancer.name} applied to your project "${project.title}". Review their application now.`,
+          data: {
+            projectId: params.id,
+            projectTitle: project.title,
+            freelancerName: freelancer.name
+          }
+        });
+      }return json({ success: "Application submitted successfully!" });
     } catch (error) {
       console.error("Error creating application:", error);
       return json({ error: "Failed to submit application" }, { status: 500 });
@@ -146,6 +176,30 @@ export async function action({ params, request }: LoaderFunctionArgs) {
       const updatedApplication = await prisma.application.update({
         where: { id: applicationId },
         data: { status: intent === "approve" ? "APPROVED" : "REJECTED" },
+        include: {
+          freelancer: {
+            select: { id: true, name: true }
+          },
+          project: {
+            select: { title: true }
+          }
+        },
+      });
+
+      // Create notification for the freelancer
+      const isApproved = intent === "approve";
+      await createNotification({
+        userId: updatedApplication.freelancer.id,
+        type: isApproved ? "APPLICATION_APPROVED" : "APPLICATION_REJECTED",
+        title: isApproved ? "Application Approved!" : "Application Update",
+        message: isApproved 
+          ? `Your application for "${updatedApplication.project.title}" has been approved! You can now start chatting.`
+          : `Your application for "${updatedApplication.project.title}" was not accepted this time.`,
+        data: {
+          applicationId: applicationId,
+          projectId: params.id,
+          projectTitle: updatedApplication.project.title
+        }
       });
 
       // If approved, create a chat for the application

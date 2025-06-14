@@ -27,6 +27,7 @@ model User {
   givenReviews            Review[]      @relation("ReviewGiver")
   receivedReviews         Review[]      @relation("ReviewReceiver")
   sentMessages            Message[]
+  notifications           Notification[]
 }
 
 model Project {
@@ -87,6 +88,18 @@ model Message {
   content   String
   createdAt DateTime  @default(now())
   readAt    DateTime?
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // e.g. APPLICATION_APPROVED, APPLICATION_REJECTED, NEW_MESSAGE, PROJECT_UPDATE
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  data      String?  // Optional JSON string for extra data (applicationId, projectId, etc)
 }
 
 enum ProjectStatus {
