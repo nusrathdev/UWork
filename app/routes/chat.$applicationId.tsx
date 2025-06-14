@@ -4,6 +4,7 @@ import { useLoaderData, Link, Form, useActionData, useNavigation, useParams } fr
 import { useState, useEffect, useRef } from "react";
 import { prisma } from "~/utils/db.server";
 import { getUserSession } from "~/utils/auth.server";
+import { createNotification } from "~/utils/notifications.server";
 
 export async function loader({ params, request }: LoaderFunctionArgs) {
   const session = await getUserSession(request);
@@ -174,24 +175,30 @@ export async function action({ params, request }: ActionFunctionArgs) {
       return json({ error: "Message content is required" }, { status: 400 });
     }
 
-    try {
-      // Verify user has access to this chat
+    try {      // Verify user has access to this chat
       const application = await prisma.application.findUnique({
         where: { id: applicationId },
         include: {
-          project: true,
+          project: {
+            include: {
+              owner: {
+                select: { id: true, name: true }
+              }
+            }
+          },
+          freelancer: {
+            select: { id: true, name: true }
+          },
           chat: true,
         },
       });
 
       if (!application) {
         return json({ error: "Application not found" }, { status: 404 });
-      }
-
-      // Check authorization
+      }      // Check authorization
       const isAuthorized = 
-        application.project.ownerId === userId || 
-        application.freelancerId === userId;
+        application.project.owner.id === userId || 
+        application.freelancer.id === userId;
 
       if (!isAuthorized) {
         return json({ error: "Not authorized to send messages in this chat" }, { status: 403 });
@@ -205,15 +212,32 @@ export async function action({ params, request }: ActionFunctionArgs) {
             applicationId: applicationId,
           },
         });
-      }
-
-      // Create the message
+      }      // Create the message
       await prisma.message.create({
         data: {
           chatId: chat.id,
           senderId: userId,
           content: content.trim(),
         },
+      });
+
+      // Create notification for the other user
+      const isOwner = application.project.owner.id === userId;
+      const recipientId = isOwner ? application.freelancer.id : application.project.owner.id;
+      const senderName = isOwner ? application.project.owner.name : application.freelancer.name;
+      const recipientName = isOwner ? application.freelancer.name : application.project.owner.name;
+        await createNotification({
+        userId: recipientId,
+        type: "NEW_MESSAGE",
+        title: "New Message",
+        message: `${senderName} sent you a message about "${application.project.title}".`,
+        data: {
+          applicationId,
+          projectId: application.project.id,
+          chatId: chat.id,
+          projectTitle: application.project.title,
+          senderName
+        }
       });
 
       return json({ success: true });
