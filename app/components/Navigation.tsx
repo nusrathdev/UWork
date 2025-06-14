@@ -71,7 +71,7 @@ export default function Navigation({ user, unreadNotificationCount = 0, recentNo
       }
     }
   }, [fetcher.data]);// Update local notifications when props change, but filter out dismissed ones
-  React.useEffect(() => {
+  useEffect(() => {
     const filteredNotifications = recentNotifications.filter(
       notification => !dismissedNotifications.has(notification.id)
     );
