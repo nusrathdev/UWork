@@ -6,7 +6,7 @@ import { useEffect } from "react";
 import { prisma } from "~/utils/db.server";
 import { getUserSession, logout } from "~/utils/auth.server";
 import { getUserChats } from "~/utils/chat.server";
-import { getUserNotifications, getUnreadNotificationCount, markNotificationAsRead } from "~/utils/notifications.server";
+import { getUserNotifications, getUnreadNotificationCount } from "~/utils/notifications.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
