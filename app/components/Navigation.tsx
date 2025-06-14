@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, Form, useFetcher } from '@remix-run/react';
+import { Link, Form, useFetcher, useLocation } from '@remix-run/react';
 
 interface User {
   id: string;
@@ -13,12 +13,40 @@ interface NavigationProps {
   recentNotifications?: any[];
 }
 
-export default function Navigation({ user, unreadNotificationCount = 0, recentNotifications = [] }: NavigationProps) {  const [localNotifications, setLocalNotifications] = useState(recentNotifications);
-  const [dismissedNotifications, setDismissedNotifications] = useState<Set<string>>(new Set());
+export default function Navigation({ user, unreadNotificationCount = 0, recentNotifications = [] }: NavigationProps) {
+  const location = useLocation();
+  const [localNotifications, setLocalNotifications] = useState(recentNotifications);
+  const [dismissedNotifications, setDismissedNotifications] = useState<Set<string>>(() => {
+    // Initialize with dismissed notifications from localStorage
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('dismissedNotifications');
+        return stored ? new Set(JSON.parse(stored)) : new Set();
+      } catch {
+        return new Set();
+      }
+    }
+    return new Set();
+  });
   const [badgeCleared, setBadgeCleared] = useState(false);
   const [currentUnreadCount, setCurrentUnreadCount] = useState(unreadNotificationCount);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const fetcher = useFetcher();
+  // Save dismissed notifications to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('dismissedNotifications', JSON.stringify([...dismissedNotifications]));
+      } catch (error) {
+        console.error('Failed to save dismissed notifications:', error);
+      }
+    }
+  }, [dismissedNotifications]);
+
+  // Close dropdown when navigating to a different page
+  useEffect(() => {
+    setDropdownOpen(false);
+  }, [location.pathname]);
 
   // Poll for new notifications every 30 seconds
   useEffect(() => {
@@ -31,43 +59,40 @@ export default function Navigation({ user, unreadNotificationCount = 0, recentNo
     const interval = setInterval(pollNotifications, 30000); // Poll every 30 seconds
     
     return () => clearInterval(interval);
-  }, [user, fetcher]);
-  // Update local state when fetcher returns new data
+  }, [user, fetcher]);  // Update local state when fetcher returns new data
   useEffect(() => {
     if (fetcher.data) {
       const data = fetcher.data as { recentNotifications?: any[], unreadCount?: number };
       if (data.recentNotifications) {
-        setLocalNotifications(data.recentNotifications.filter(
-          (notification: any) => !dismissedNotifications.has(notification.id)
-        ));
+        // Don't filter dismissed notifications here - keep all server data
+        setLocalNotifications(data.recentNotifications);
         setCurrentUnreadCount(data.unreadCount || 0);
         setBadgeCleared(false); // Reset badge cleared state when new notifications arrive
       }
     }
-  }, [fetcher.data, dismissedNotifications]);
-  // Update local notifications when props change, but filter out dismissed ones
+  }, [fetcher.data]);// Update local notifications when props change, but filter out dismissed ones
   React.useEffect(() => {
     const filteredNotifications = recentNotifications.filter(
       notification => !dismissedNotifications.has(notification.id)
     );
     setLocalNotifications(filteredNotifications);
     setCurrentUnreadCount(unreadNotificationCount);
-  }, [recentNotifications, dismissedNotifications, unreadNotificationCount]);// Handle individual notification removal from dropdown only
+  }, [recentNotifications, dismissedNotifications, unreadNotificationCount]);  // Handle individual notification removal from dropdown only (local)
   const handleDeleteNotification = (notificationId: string) => {
     // Remove from local dropdown state
     setLocalNotifications(prev => prev.filter(n => n.id !== notificationId));
     // Add to dismissed set to prevent it from reappearing
     setDismissedNotifications(prev => new Set([...prev, notificationId]));
-  };
-  // Handle clear all notifications from dropdown only
+    // Don't close dropdown - keep it open
+  };  // Handle clear all notifications from dropdown only (local)
   const handleClearAll = () => {
     // Get all current notification IDs and add them to dismissed set
     const currentNotificationIds = localNotifications.map(n => n.id);
     setDismissedNotifications(prev => new Set([...prev, ...currentNotificationIds]));
     
-    // Clear local dropdown state
+    // Clear local dropdown state but keep dropdown open
     setLocalNotifications([]);
-    setDropdownOpen(false); // Close dropdown after clearing
+    // Don't close dropdown - user can close it manually
   };// Calculate the actual unread count excluding dismissed notifications
   const actualUnreadCount = badgeCleared ? 0 : Math.max(
     currentUnreadCount - dismissedNotifications.size,
@@ -79,25 +104,30 @@ export default function Navigation({ user, unreadNotificationCount = 0, recentNo
     e.stopPropagation();
     setDropdownOpen(!dropdownOpen);
     setBadgeCleared(true);
-  };
-  // Handle clicking on individual notification (clear badge and close dropdown)
+  };  // Handle clicking on individual notification link (clear badge and close dropdown)
   const handleNotificationClick = () => {
     setBadgeCleared(true);
     setDropdownOpen(false);
   };
-
   // Close dropdown when clicking elsewhere
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element;
+      // Don't close if clicking inside the notification dropdown
       if (!target.closest('[data-notification-dropdown]')) {
         setDropdownOpen(false);
       }
     };
 
     if (dropdownOpen) {
-      document.addEventListener('click', handleClickOutside);
-      return () => document.removeEventListener('click', handleClickOutside);
+      // Use a small delay to ensure our click handlers run first
+      setTimeout(() => {
+        document.addEventListener('click', handleClickOutside);
+      }, 0);
+      
+      return () => {
+        document.removeEventListener('click', handleClickOutside);
+      };
     }
   }, [dropdownOpen]);
   // Helper function to get the link for a notification
@@ -261,28 +291,28 @@ export default function Navigation({ user, unreadNotificationCount = 0, recentNo
                           localNotifications.slice(0, 5).map((notification: any) => {
                             const notificationLink = getNotificationLink(notification);
                             
-                            return (
-                              <div
+                            return (                              <div
                                 key={notification.id}
                                 className={`relative group/notification p-3 rounded-lg border hover:bg-gray-100 transition-colors ${
                                   notification.read 
                                     ? 'bg-gray-50 border-gray-200' 
                                     : 'bg-blue-50 border-blue-200'
                                 }`}
-                              >
-                                {/* Delete button */}
+                              >{/* Delete button */}
                                 <button
                                   onClick={(e) => {
+                                    e.preventDefault();
                                     e.stopPropagation();
+                                    e.nativeEvent.stopImmediatePropagation();
                                     handleDeleteNotification(notification.id);
                                   }}
-                                  className="absolute top-2 right-2 opacity-0 group-hover/notification:opacity-100 transition-opacity text-gray-400 hover:text-red-500 p-1"
+                                  className="absolute top-2 right-2 opacity-0 group-hover/notification:opacity-100 transition-opacity text-gray-400 hover:text-red-500 p-1 z-10"
                                   title="Remove notification"
                                 >
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                   </svg>
-                                </button>                                {/* Notification content */}
+                                </button>{/* Notification content */}
                                 {notificationLink ? (
                                   <Link to={notificationLink} className="block pr-6" onClick={handleNotificationClick}>                                    <h4 className={`font-medium text-sm ${
                                       notification.read ? 'text-gray-700' : 'text-blue-900'
@@ -322,12 +352,16 @@ export default function Navigation({ user, unreadNotificationCount = 0, recentNo
                             No new notifications
                           </div>
                         )}
-                      </div>
-                        {/* Clear All link */}
+                      </div>                        {/* Clear All link */}
                       {localNotifications.length > 0 && (
                         <div className="border-t border-gray-200 mt-3 pt-3 text-center">
                           <button
-                            onClick={handleClearAll}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              e.nativeEvent.stopImmediatePropagation();
+                              handleClearAll();
+                            }}
                             className="text-sm text-red-600 hover:text-red-700 underline transition-colors"
                           >
                             Clear All
