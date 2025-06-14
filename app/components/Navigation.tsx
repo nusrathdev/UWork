@@ -66,18 +66,30 @@ export default function Navigation({ user, unreadNotificationCount = 0, recentNo
       if (data.recentNotifications) {
         // Don't filter dismissed notifications here - keep all server data
         setLocalNotifications(data.recentNotifications);
-        setCurrentUnreadCount(data.unreadCount || 0);
-        setBadgeCleared(false); // Reset badge cleared state when new notifications arrive
+        const newUnreadCount = data.unreadCount || 0;
+        
+        // Reset badge cleared state if we have more unread notifications than before
+        if (newUnreadCount > currentUnreadCount) {
+          setBadgeCleared(false);
+        }
+        
+        setCurrentUnreadCount(newUnreadCount);
       }
     }
-  }, [fetcher.data]);// Update local notifications when props change, but filter out dismissed ones
+  }, [fetcher.data, currentUnreadCount]);// Update local notifications when props change, but filter out dismissed ones
   React.useEffect(() => {
     const filteredNotifications = recentNotifications.filter(
       notification => !dismissedNotifications.has(notification.id)
     );
     setLocalNotifications(filteredNotifications);
+    
+    // Reset badge cleared state if we have more unread notifications than before
+    if (unreadNotificationCount > currentUnreadCount) {
+      setBadgeCleared(false);
+    }
+    
     setCurrentUnreadCount(unreadNotificationCount);
-  }, [recentNotifications, dismissedNotifications, unreadNotificationCount]);  // Handle individual notification removal from dropdown only (local)
+  }, [recentNotifications, dismissedNotifications, unreadNotificationCount, currentUnreadCount]);// Handle individual notification removal from dropdown only (local)
   const handleDeleteNotification = (notificationId: string) => {
     // Remove from local dropdown state
     setLocalNotifications(prev => prev.filter(n => n.id !== notificationId));
@@ -262,15 +274,12 @@ export default function Navigation({ user, unreadNotificationCount = 0, recentNo
                   <button 
                     onClick={handleBellClick}
                     className="text-gray-700 hover:text-green-600 p-2 rounded-lg transition-colors hover:bg-gray-50 relative"
-                  >
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  >                    <svg className="w-5 h-5 relative" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+                      {actualUnreadCount > 0 && (
+                        <circle cx="18" cy="6" r="3" fill="#ef4444" />
+                      )}
                     </svg>
-                    {actualUnreadCount > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
-                        {actualUnreadCount > 9 ? '9+' : actualUnreadCount}
-                      </span>
-                    )}
                   </button>
                   
                   {/* Notification Dropdown */}
