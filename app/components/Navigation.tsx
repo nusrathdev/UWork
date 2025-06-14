@@ -13,11 +13,11 @@ interface NavigationProps {
   recentNotifications?: any[];
 }
 
-export default function Navigation({ user, unreadNotificationCount = 0, recentNotifications = [] }: NavigationProps) {
-  const [localNotifications, setLocalNotifications] = useState(recentNotifications);
+export default function Navigation({ user, unreadNotificationCount = 0, recentNotifications = [] }: NavigationProps) {  const [localNotifications, setLocalNotifications] = useState(recentNotifications);
   const [dismissedNotifications, setDismissedNotifications] = useState<Set<string>>(new Set());
   const [badgeCleared, setBadgeCleared] = useState(false);
   const [currentUnreadCount, setCurrentUnreadCount] = useState(unreadNotificationCount);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const fetcher = useFetcher();
 
   // Poll for new notifications every 30 seconds
@@ -59,28 +59,47 @@ export default function Navigation({ user, unreadNotificationCount = 0, recentNo
     // Add to dismissed set to prevent it from reappearing
     setDismissedNotifications(prev => new Set([...prev, notificationId]));
   };
-
   // Handle clear all notifications from dropdown only
   const handleClearAll = () => {
     // Get all current notification IDs and add them to dismissed set
     const currentNotificationIds = localNotifications.map(n => n.id);
-    setDismissedNotifications(prev => new Set([...prev, ...currentNotificationIds]));    // Clear local dropdown state
+    setDismissedNotifications(prev => new Set([...prev, ...currentNotificationIds]));
+    
+    // Clear local dropdown state
     setLocalNotifications([]);
-  };  // Calculate the actual unread count excluding dismissed notifications
+    setDropdownOpen(false); // Close dropdown after clearing
+  };// Calculate the actual unread count excluding dismissed notifications
   const actualUnreadCount = badgeCleared ? 0 : Math.max(
     currentUnreadCount - dismissedNotifications.size,
     localNotifications.filter(notification => !notification.read && !dismissedNotifications.has(notification.id)).length
   );
-
-  // Handle clicking on notification bell (clear badge)
-  const handleBellClick = () => {
+  // Handle clicking on notification bell (toggle dropdown and clear badge)
+  const handleBellClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDropdownOpen(!dropdownOpen);
     setBadgeCleared(true);
   };
-
-  // Handle clicking on individual notification (clear badge)
+  // Handle clicking on individual notification (clear badge and close dropdown)
   const handleNotificationClick = () => {
     setBadgeCleared(true);
+    setDropdownOpen(false);
   };
+
+  // Close dropdown when clicking elsewhere
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('[data-notification-dropdown]')) {
+        setDropdownOpen(false);
+      }
+    };
+
+    if (dropdownOpen) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [dropdownOpen]);
   // Helper function to get the link for a notification
   const getNotificationLink = (notification: any) => {
     let data = null;
@@ -208,24 +227,26 @@ export default function Navigation({ user, unreadNotificationCount = 0, recentNo
           </div>
 
           <div className="flex items-center space-x-4">
-            {user ? (              <div className="flex items-center space-x-3">
-                {/* Notification Bell - clickable to page, hover for dropdown */}
-                <div className="relative group">                  <Link 
-                    to="/notifications"
-                    className="text-gray-700 hover:text-green-600 p-2 rounded-lg transition-colors hover:bg-gray-50 relative block"
+            {user ? (              <div className="flex items-center space-x-3">                {/* Notification Bell - clickable to toggle dropdown */}
+                <div className="relative" data-notification-dropdown>
+                  <button 
                     onClick={handleBellClick}
+                    className="text-gray-700 hover:text-green-600 p-2 rounded-lg transition-colors hover:bg-gray-50 relative"
                   >
                     <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
-                    </svg>                    {actualUnreadCount > 0 && (
+                    </svg>
+                    {actualUnreadCount > 0 && (
                       <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
                         {actualUnreadCount > 9 ? '9+' : actualUnreadCount}
                       </span>
                     )}
-                  </Link>
+                  </button>
                   
                   {/* Notification Dropdown */}
-                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  <div className={`absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 transition-all duration-200 z-50 ${
+                    dropdownOpen ? 'opacity-100 visible' : 'opacity-0 invisible'
+                  }`}>
                     <div className="p-4">
                       <div className="flex items-center justify-between mb-3">
                         <h3 className="text-lg font-semibold text-gray-900">Notifications</h3>
