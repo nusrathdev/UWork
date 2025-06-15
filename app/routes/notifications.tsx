@@ -84,16 +84,14 @@ export default function Notifications() {
     } catch (error) {
       console.error('Error parsing notification data:', error);
       data = null;
-    }
-    
-    switch (notification.type) {
+    }    switch (notification.type) {
       case 'APPLICATION_APPROVED':
       case 'APPLICATION_REJECTED':
-        return data?.applicationId ? `/chat/${data.applicationId}` : null;
+        return data?.applicationId ? `/messages?chat=${data.applicationId}` : null;
       case 'NEW_APPLICATION':
         return data?.projectId ? `/projects/${data.projectId}` : null;
       case 'NEW_MESSAGE':
-        return data?.applicationId ? `/chat/${data.applicationId}` : null;
+        return data?.applicationId ? `/messages?chat=${data.applicationId}` : null;
       case 'PROJECT_UPDATE':
         return data?.projectId ? `/projects/${data.projectId}` : null;
       default:

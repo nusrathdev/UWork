@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { json, redirect } from "@remix-run/node";
-import { useLoaderData, Link, useParams, useFetcher, Form, useNavigate } from "@remix-run/react";
+import { useLoaderData, Link, useParams, useFetcher, Form } from "@remix-run/react";
 import { useState, useEffect, useRef } from "react";
 import { prisma } from "~/utils/db.server";
 import { getUserSession } from "~/utils/auth.server";
@@ -118,7 +118,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
     if (!user) {
       return redirect("/auth/login");
-    }// Get all chats with detailed information
+    }
+
+    // Get all chats with detailed information
     const chats = await prisma.chat.findMany({
       where: {
         application: {
@@ -198,7 +200,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
         } : null,
         unreadCount,
         updatedAt: lastMessage?.createdAt || new Date(),
-        status: chat.application.status,      };
+        status: chat.application.status,
+      };
     });    // Load messages for selected chat if specified
     let selectedChatMessages: any[] = [];
     if (selectedApplicationId) {
@@ -246,44 +249,24 @@ export default function MessagesPage() {
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fetcher = useFetcher();
-  const navigate = useNavigate();
 
   const selectedChat = chats.find(chat => chat.applicationId === selectedChatId);
-  // Auto-scroll to bottom only when new messages are added or chat is first loaded
-  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
-  const [previousMessageCount, setPreviousMessageCount] = useState(0);  useEffect(() => {
-    // Only auto-scroll if:
-    // 1. It's the initial load (shouldAutoScroll is true)
-    // 2. New messages were added (message count increased)
-    const currentMessageCount = selectedChatMessages.length;
-    
-    if (shouldAutoScroll || currentMessageCount > previousMessageCount) {
-      // Use a more controlled scroll that doesn't affect the entire page
-      setTimeout(() => {
-        if (messagesEndRef.current) {
-          const messagesContainer = messagesEndRef.current.closest('.overflow-y-auto');
-          if (messagesContainer) {
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-          }
-        }
-      }, 100); // Small delay to ensure DOM is updated
-      setShouldAutoScroll(false); // Disable auto-scroll after first load
-    }
-    
-    setPreviousMessageCount(currentMessageCount);
-  }, [selectedChatMessages, shouldAutoScroll, previousMessageCount]);
 
-  // Reset auto-scroll when switching chats
+  // Auto-scroll to bottom when messages change
   useEffect(() => {
-    setShouldAutoScroll(true);
-    setPreviousMessageCount(0);
-  }, [selectedChatId]);
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [selectedChatMessages]);
+
   // Handle chat selection
   const handleChatSelect = (applicationId: string) => {
     setSelectedChatId(applicationId);
-    // Navigate to the URL to trigger loader and fetch messages
-    navigate(`/messages?chat=${applicationId}`);
-  };  // Handle sending message
+    // Update URL to reflect selected chat
+    const url = new URL(window.location.href);
+    url.searchParams.set('chat', applicationId);
+    window.history.replaceState({}, '', url.toString());
+  };
+
+  // Handle sending message
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedChatId) return;
@@ -295,16 +278,10 @@ export default function MessagesPage() {
 
     fetcher.submit(formData, { method: 'post' });
     setNewMessage('');
-    setShouldAutoScroll(true); // Enable auto-scroll for new message
-  };// Reload messages after sending a message
-  useEffect(() => {
-    if (fetcher.state === "idle" && fetcher.data && typeof fetcher.data === 'object' && 'success' in fetcher.data && selectedChatId) {
-      // Reload the page to get updated messages
-      navigate(`/messages?chat=${selectedChatId}`, { replace: true });
-    }
-  }, [fetcher.state, fetcher.data, selectedChatId, navigate]);
+  };
 
   const isSubmitting = fetcher.state === "submitting";
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -361,7 +338,8 @@ export default function MessagesPage() {
                   </div>
                 </div>
               ) : (
-                <div>                  {chats.map((chat) => (
+                <div>
+                  {chats.map((chat) => (
                     <div
                       key={chat.id}
                       onClick={() => handleChatSelect(chat.applicationId)}
@@ -434,9 +412,10 @@ export default function MessagesPage() {
                     </div>
                   ))}
                 </div>
-              )}            </div>
+              )}
+            </div>
           </div>
-          
+
           {/* Chat Content Area */}
           <div className="flex-1 flex flex-col bg-white">
             {selectedChat ? (
@@ -482,8 +461,10 @@ export default function MessagesPage() {
                       </Link>
                     </div>
                   </div>
-                </div>                {/* Messages Area */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-4" style={{ scrollBehavior: 'smooth' }}>
+                </div>
+
+                {/* Messages Area */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-4">
                   {selectedChatMessages.length === 0 ? (
                     <div className="flex items-center justify-center h-full">
                       <div className="text-center">
@@ -499,11 +480,11 @@ export default function MessagesPage() {
                       </div>
                     </div>
                   ) : (
-                    <>                      {selectedChatMessages.map((message: any) => (
+                    <>
+                      {selectedChatMessages.map((message: any) => (
                         <div
                           key={message.id}
                           className={`flex ${message.isFromCurrentUser ? 'justify-end' : 'justify-start'}`}
-                          onClick={(e) => e.stopPropagation()} // Prevent any click propagation
                         >
                           <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
                             message.isFromCurrentUser
@@ -556,7 +537,8 @@ export default function MessagesPage() {
                         </svg>
                       )}
                       <span>Send</span>
-                    </button>                  </form>
+                    </button>
+                  </form>
                 </div>
               </>
             ) : (
