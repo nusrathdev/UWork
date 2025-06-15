@@ -384,14 +384,13 @@ export default function MessagesPage() {
     }
   }, [fetcher.state, fetcher.data, selectedChatId, navigate]);
 
-  const isSubmitting = fetcher.state === "submitting";
-  return (
+  const isSubmitting = fetcher.state === "submitting";  return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-lg shadow-sm h-[calc(100vh-180px)] flex overflow-hidden">
+      <div className="max-w-full mx-auto px-2 sm:px-4 lg:px-6 py-4">
+        <div className="bg-white rounded-lg shadow-sm h-[calc(100vh-100px)] flex overflow-hidden">
           
           {/* Chat List Sidebar */}
-          <div className="w-1/3 border-r border-gray-200 flex flex-col bg-gray-50">
+          <div className="w-1/4 border-r border-gray-200 flex flex-col bg-gray-50">
             <div className="p-6 border-b border-gray-200 bg-white">
               <div className="flex items-center justify-between">
                 <div>
@@ -516,20 +515,18 @@ export default function MessagesPage() {
                 </div>
               )}            </div>
           </div>
-          
-          {/* Chat Content Area */}
+            {/* Chat Content Area */}
           <div className="flex-1 flex flex-col bg-white">
             {selectedChat ? (
-              <>
-                {/* Chat Header */}
-                <div className="p-6 border-b border-gray-200 bg-white">
+              <>                {/* Chat Header - Compact */}
+                <div className="p-4 border-b border-gray-200 bg-white">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
                       <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-lg">
                         {selectedChat.otherUser.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <h2 className="text-xl font-bold text-gray-900">
+                        <h2 className="text-lg font-bold text-gray-900">
                           {selectedChat.otherUser.name}
                         </h2>
                         <p className="text-sm text-gray-600">
@@ -562,12 +559,11 @@ export default function MessagesPage() {
                       </Link>
                     </div>
                   </div>
-                </div>                {/* Messages Area */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-4" style={{ scrollBehavior: 'smooth' }}>
+                </div>{/* Messages Area - Much larger for better chat viewing */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-4 min-h-0" style={{ scrollBehavior: 'smooth', minHeight: 'calc(100vh - 400px)' }}>
                   {selectedChatMessages.length === 0 ? (
-                    <div className="flex items-center justify-center h-full">
-                      <div className="text-center">
-                        <div className="bg-blue-50 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                    <div className="flex items-center justify-center h-full min-h-[300px]">
+                      <div className="text-center">                        <div className="bg-blue-50 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
                           <svg className="w-8 h-8 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7z" clipRule="evenodd" />
                           </svg>
@@ -641,8 +637,8 @@ export default function MessagesPage() {
                       <div ref={messagesEndRef} />
                     </>
                   )}
-                </div>                {/* Message Input */}
-                <div className="p-6 border-t border-gray-200 bg-gray-50">
+                </div>                {/* Message Input - Normal size, positioned at bottom */}
+                <div className="flex-shrink-0 p-8 border-t border-gray-200 bg-white">
                   {/* File Preview */}
                   {selectedFile && (
                     <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
@@ -669,7 +665,7 @@ export default function MessagesPage() {
                     </div>
                   )}
                   
-                  <form onSubmit={handleSendMessage} className="flex space-x-4">                    {/* Hidden file input */}
+                  <form onSubmit={handleSendMessage} className="space-y-3">                    {/* Hidden file input */}
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -677,50 +673,58 @@ export default function MessagesPage() {
                       className="hidden"
                       accept="image/*,.pdf,.doc,.docx,.txt"
                       multiple={false}
-                    />
-                    
-                    <div className="flex-1 flex items-end space-x-3">
-                      <div className="flex-1">
-                        <input
-                          type="text"
-                          value={newMessage}
-                          onChange={(e) => setNewMessage(e.target.value)}
-                          placeholder={`Message ${selectedChat.otherUser.name}...`}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          disabled={isSubmitting}
-                        />
+                    />                      {/* Message input field - Normal size with buttons inline */}
+                    <div className="w-full">
+                      <div className="flex items-end space-x-4">
+                        <div className="flex-1">                          <textarea
+                            value={newMessage}
+                            onChange={(e) => setNewMessage(e.target.value)}
+                            placeholder={`Message ${selectedChat.otherUser.name}...`}
+                            className="w-full px-6 py-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-all duration-200 text-base"
+                            disabled={isSubmitting}
+                            rows={4}
+                            style={{ minHeight: '120px' }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSendMessage(e);
+                              }
+                            }}
+                          />
+                        </div>
+                          {/* Attach button */}
+                        <button
+                          type="button"
+                          onClick={handleAttachClick}
+                          className="p-4 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors flex items-center justify-center"
+                          title="Attach file"
+                        >
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                          </svg>
+                        </button>
+                        
+                        {/* Send button */}
+                        <button
+                          type="submit"
+                          disabled={(!newMessage.trim() && !selectedFile) || isSubmitting}
+                          className="px-8 py-4 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-3 transition-colors text-base font-medium"
+                        >
+                          {isSubmitting ? (
+                            <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"></circle>
+                              <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" className="opacity-75"></path>
+                            </svg>
+                          ) : (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                            </svg>
+                          )}
+                          <span>Send</span>
+                        </button>
                       </div>
-                      
-                      {/* Attach button */}
-                      <button
-                        type="button"
-                        onClick={handleAttachClick}
-                        className="p-3 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                        title="Attach file"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                        </svg>
-                      </button>
                     </div>
-                    
-                    <button
-                      type="submit"
-                      disabled={(!newMessage.trim() && !selectedFile) || isSubmitting}
-                      className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 transition-colors"
-                    >
-                      {isSubmitting ? (
-                        <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"></circle>
-                          <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" className="opacity-75"></path>
-                        </svg>
-                      ) : (
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                        </svg>
-                      )}
-                      <span>Send</span>
-                    </button></form>
+                  </form>
                 </div>
               </>
             ) : (
