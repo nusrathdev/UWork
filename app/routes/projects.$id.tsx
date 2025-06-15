@@ -378,7 +378,7 @@ export default function ProjectDetail() {
                     </p>
                     <div className="flex space-x-3">
                       <Link
-                        to={`/chat/${userApplication.id}`}
+                        to={`/messages/${userApplication.id}`}
                         className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
                       >
                         <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
@@ -545,7 +545,7 @@ export default function ProjectDetail() {
                         )}                        {/* Chat button for approved applications */}
                         {application.status === 'APPROVED' && (
                           <Link
-                            to={`/chat/${application.id}`}
+                            to={`/messages/${application.id}`}
                             className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-xs"
                           >
                             <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">

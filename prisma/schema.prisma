@@ -80,14 +80,18 @@ model Chat {
 }
 
 model Message {
-  id        String    @id @default(cuid())
-  chatId    String
-  chat      Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  senderId  String
-  sender    User      @relation(fields: [senderId], references: [id], onDelete: Cascade)
-  content   String
-  createdAt DateTime  @default(now())
-  readAt    DateTime?
+  id               String    @id @default(cuid())
+  chatId           String
+  chat             Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  senderId         String
+  sender           User      @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  content          String
+  attachmentUrl    String?   // URL/path to the uploaded file
+  attachmentName   String?   // Original filename
+  attachmentSize   Int?      // File size in bytes
+  attachmentType   String?   // MIME type
+  createdAt        DateTime  @default(now())
+  readAt           DateTime?
 }
 
 model Notification {

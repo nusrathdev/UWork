@@ -46,11 +46,9 @@ export default function App() {
       <body className="bg-gray-50 min-h-screen">
         <Navigation user={user} unreadNotificationCount={unreadCount} recentNotifications={recentNotifications} />
         <main>
-          <Outlet />
-        </main>
+          <Outlet />        </main>
         <ScrollRestoration />
         <Scripts />
-        <LiveReload />
       </body>
     </html>
   );

@@ -227,7 +227,7 @@ export default function Dashboard() {
                         {new Date(app.updatedAt).toLocaleTimeString()}
                         {app.status === 'APPROVED' && (
                           <Link
-                            to={`/chat/${app.id}`}
+                            to={`/messages/${app.id}`}
                             className="ml-2 text-green-600 hover:text-green-700 underline"
                           >
                             Start chatting →
@@ -337,7 +337,7 @@ export default function Dashboard() {
                         )}
                       </div>
                       <Link
-                        to={`/chat/${chat.applicationId}`}
+                        to={`/messages/${chat.applicationId}`}
                         className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm"
                       >
                         <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
@@ -416,7 +416,7 @@ export default function Dashboard() {
                         </Link>
                         {application.status === 'APPROVED' && (
                           <Link
-                            to={`/chat/${application.id}`}
+                            to={`/messages/${application.id}`}
                             className="inline-flex items-center px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm"
                           >
                             <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
