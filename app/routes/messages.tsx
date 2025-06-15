@@ -333,19 +333,13 @@ export default function MessagesPage() {
       formData.append('attachment', selectedFile);
     }
 
-    // Use fetch directly for file uploads
-    fetch(window.location.pathname + window.location.search, {
-      method: 'POST',
-      body: formData
-    }).then(response => {
-      if (response.ok) {
-        // Reload the page to show the new message
-        window.location.reload();
-      }
-    }).catch(error => {
-      console.error('Upload error:', error);
+    // Use Remix's fetcher for SPA experience
+    fetcher.submit(formData, {
+      method: 'post',
+      action: window.location.pathname + window.location.search,
+      encType: 'multipart/form-data',
     });
-    
+
     setNewMessage('');
     setSelectedFile(null);
     if (fileInputRef.current) {
