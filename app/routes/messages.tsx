@@ -16,17 +16,46 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   const formData = await request.formData();
-  const intent = formData.get("intent");
-
-  if (intent === "send") {
+  const intent = formData.get("intent");  if (intent === "send") {
     const applicationId = formData.get("applicationId");
     const content = formData.get("content");
+    const file = formData.get("attachment") as File | null;
 
-    if (typeof applicationId !== "string" || typeof content !== "string" || !content.trim()) {
+    if (typeof applicationId !== "string" || (!content?.toString().trim() && !file)) {
       return json({ error: "Invalid data" }, { status: 400 });
     }
 
-    try {
+    try {      // Handle file upload if present
+      let attachmentData = null;
+      
+      if (file && file.size > 0) {
+        // For now, we'll store files in a public uploads directory
+        // In production, you'd want to use a proper file storage service
+        const uploadsDir = "public/uploads";
+        const fileName = `${Date.now()}-${file.name}`;
+        const filePath = `${uploadsDir}/${fileName}`;
+        
+        // Create uploads directory if it doesn't exist
+        const fs = await import("fs");
+        const path = await import("path");
+          if (!fs.existsSync(uploadsDir)) {
+          fs.mkdirSync(uploadsDir, { recursive: true });
+        }
+        
+        // Save file
+        const buffer = Buffer.from(await file.arrayBuffer());
+        fs.writeFileSync(filePath, buffer);
+        console.log('File saved to:', filePath);
+        
+        attachmentData = {
+          attachmentUrl: `/uploads/${fileName}`,
+          attachmentName: file.name,
+          attachmentSize: file.size,
+          attachmentType: file.type
+        };
+        console.log('Attachment data:', attachmentData);
+      }
+
       // Get or create chat
       let chat = await prisma.chat.findUnique({
         where: { applicationId },
@@ -54,15 +83,17 @@ export async function action({ request }: ActionFunctionArgs) {
             }
           }
         });
-      }
-
-      // Create message
+      }      // Create message
+      const messageData = {
+        chatId: chat.id,
+        senderId: userId,
+        content: content?.toString().trim() || "",
+        ...attachmentData
+      };
+      console.log('Creating message with data:', messageData);
+      
       await prisma.message.create({
-        data: {
-          chatId: chat.id,
-          senderId: userId,
-          content: content.trim(),
-        },
+        data: messageData,
       });
 
       // Create notification for the other user
@@ -216,14 +247,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
         }
       });
 
-      if (selectedChat) {
-        selectedChatMessages = selectedChat.messages.map(msg => ({
+      if (selectedChat) {        selectedChatMessages = selectedChat.messages.map((msg: any) => ({
           id: msg.id,
           content: msg.content,
           senderId: msg.senderId,
           senderName: msg.sender.name,
           createdAt: msg.createdAt,
-          isFromCurrentUser: msg.senderId === userId
+          isFromCurrentUser: msg.senderId === userId,
+          attachmentUrl: msg.attachmentUrl,
+          attachmentName: msg.attachmentName,
+          attachmentSize: msg.attachmentSize,
+          attachmentType: msg.attachmentType
         }));
       }
     }
@@ -244,7 +278,9 @@ export default function MessagesPage() {
   const { user, chats, selectedApplicationId, selectedChatMessages } = useLoaderData<typeof loader>();
   const [selectedChatId, setSelectedChatId] = useState<string | null>(selectedApplicationId);
   const [newMessage, setNewMessage] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const fetcher = useFetcher();
   const navigate = useNavigate();
 
@@ -286,17 +322,61 @@ export default function MessagesPage() {
   };  // Handle sending message
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !selectedChatId) return;
+    if ((!newMessage.trim() && !selectedFile) || !selectedChatId) return;
 
     const formData = new FormData();
     formData.append('intent', 'send');
     formData.append('applicationId', selectedChatId);
     formData.append('content', newMessage);
+    
+    if (selectedFile) {
+      formData.append('attachment', selectedFile);
+    }
 
-    fetcher.submit(formData, { method: 'post' });
+    // Use fetch directly for file uploads
+    fetch(window.location.pathname + window.location.search, {
+      method: 'POST',
+      body: formData
+    }).then(response => {
+      if (response.ok) {
+        // Reload the page to show the new message
+        window.location.reload();
+      }
+    }).catch(error => {
+      console.error('Upload error:', error);
+    });
+    
     setNewMessage('');
-    setShouldAutoScroll(true); // Enable auto-scroll for new message
-  };// Reload messages after sending a message
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    setShouldAutoScroll(true);
+  };  // Handle file attachment
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Check file size (limit to 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        alert('File size must be less than 10MB');
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };  // Handle attach button click
+  const handleAttachClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  // Remove selected file
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Reload messages after sending a message
   useEffect(() => {
     if (fetcher.state === "idle" && fetcher.data && typeof fetcher.data === 'object' && 'success' in fetcher.data && selectedChatId) {
       // Reload the page to get updated messages
@@ -504,13 +584,49 @@ export default function MessagesPage() {
                           key={message.id}
                           className={`flex ${message.isFromCurrentUser ? 'justify-end' : 'justify-start'}`}
                           onClick={(e) => e.stopPropagation()} // Prevent any click propagation
-                        >
-                          <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                        >                          <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
                             message.isFromCurrentUser
                               ? 'bg-blue-600 text-white'
                               : 'bg-gray-100 text-gray-900'
                           }`}>
-                            <p className="text-sm">{message.content}</p>
+                            {message.content && <p className="text-sm">{message.content}</p>}
+                            
+                            {/* Display attachment if present */}
+                            {message.attachmentUrl && (
+                              <div className="mt-2">
+                                {message.attachmentType?.startsWith('image/') ? (
+                                  <img 
+                                    src={message.attachmentUrl} 
+                                    alt={message.attachmentName}
+                                    className="max-w-full h-auto rounded-md cursor-pointer"
+                                    onClick={() => window.open(message.attachmentUrl, '_blank')}
+                                  />
+                                ) : (
+                                  <div className={`flex items-center space-x-2 p-2 rounded-md ${
+                                    message.isFromCurrentUser ? 'bg-blue-500' : 'bg-gray-200'
+                                  }`}>
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    <a 
+                                      href={message.attachmentUrl} 
+                                      download={message.attachmentName}
+                                      className={`text-sm underline ${
+                                        message.isFromCurrentUser ? 'text-blue-100' : 'text-blue-600'
+                                      }`}
+                                    >
+                                      {message.attachmentName}
+                                    </a>
+                                    <span className={`text-xs ${
+                                      message.isFromCurrentUser ? 'text-blue-200' : 'text-gray-500'
+                                    }`}>
+                                      ({Math.round((message.attachmentSize || 0) / 1024)} KB)
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            
                             <p className={`text-xs mt-1 ${
                               message.isFromCurrentUser ? 'text-blue-200' : 'text-gray-500'
                             }`}>
@@ -525,24 +641,72 @@ export default function MessagesPage() {
                       <div ref={messagesEndRef} />
                     </>
                   )}
-                </div>
-
-                {/* Message Input */}
+                </div>                {/* Message Input */}
                 <div className="p-6 border-t border-gray-200 bg-gray-50">
-                  <form onSubmit={handleSendMessage} className="flex space-x-4">
-                    <div className="flex-1">
-                      <input
-                        type="text"
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        placeholder={`Message ${selectedChat.otherUser.name}...`}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        disabled={isSubmitting}
-                      />
+                  {/* File Preview */}
+                  {selectedFile && (
+                    <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{selectedFile.name}</p>
+                            <p className="text-xs text-gray-500">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleRemoveFile}
+                          className="text-gray-400 hover:text-gray-600 p-1"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
+                  )}
+                  
+                  <form onSubmit={handleSendMessage} className="flex space-x-4">                    {/* Hidden file input */}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                      accept="image/*,.pdf,.doc,.docx,.txt"
+                      multiple={false}
+                    />
+                    
+                    <div className="flex-1 flex items-end space-x-3">
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          value={newMessage}
+                          onChange={(e) => setNewMessage(e.target.value)}
+                          placeholder={`Message ${selectedChat.otherUser.name}...`}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                      
+                      {/* Attach button */}
+                      <button
+                        type="button"
+                        onClick={handleAttachClick}
+                        className="p-3 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                        title="Attach file"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                        </svg>
+                      </button>
+                    </div>
+                    
                     <button
                       type="submit"
-                      disabled={!newMessage.trim() || isSubmitting}
+                      disabled={(!newMessage.trim() && !selectedFile) || isSubmitting}
                       className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 transition-colors"
                     >
                       {isSubmitting ? (
@@ -556,7 +720,7 @@ export default function MessagesPage() {
                         </svg>
                       )}
                       <span>Send</span>
-                    </button>                  </form>
+                    </button></form>
                 </div>
               </>
             ) : (
