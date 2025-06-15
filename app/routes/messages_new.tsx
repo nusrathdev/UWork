@@ -27,8 +27,7 @@ export async function action({ request }: ActionFunctionArgs) {
       return json({ error: "Invalid data" }, { status: 400 });
     }
 
-    try {
-      // Handle file upload if present
+    try {      // Handle file upload if present
       let attachmentData: {
         attachmentUrl: string;
         attachmentName: string;
@@ -92,9 +91,7 @@ export async function action({ request }: ActionFunctionArgs) {
             }
           }
         });
-      }
-
-      // Create message
+      }      // Create message
       const messageData = {
         chatId: chat.id,
         senderId: userId,
@@ -111,9 +108,7 @@ export async function action({ request }: ActionFunctionArgs) {
       const isOwner = chat.application.project.owner.id === userId;
       const recipientId = isOwner 
         ? chat.application.freelancer.id 
-        : chat.application.project.owner.id;
-
-      await createNotification({
+        : chat.application.project.owner.id;      await createNotification({
         userId: recipientId,
         type: "NEW_MESSAGE",
         title: "New message",
@@ -154,7 +149,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
     if (!user) {
       return redirect("/auth/login");
-    }    // Get all chats for the user
+    }
+
+    // Get all chats for the user
     const chats = await prisma.chat.findMany({
       where: {
         application: {
@@ -191,25 +188,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     });
 
     // Format chats for easier use in the component
-    // Filter chats: freelancers can only see chats for APPROVED applications
-    const formattedChats = chats
-      .filter((chat: any) => {
-        const isOwner = chat.application.project.owner.id === userId;
-        const isFreelancer = chat.application.freelancer.id === userId;
-        
-        // Owners can see all their chats regardless of status
-        if (isOwner) {
-          return true;
-        }
-        
-        // Freelancers can only see chats for APPROVED applications
-        if (isFreelancer) {
-          return chat.application.status === 'APPROVED';
-        }
-        
-        return false;
-      })
-      .map((chat: any) => {
+    const formattedChats = chats.map((chat: any) => {
       const isOwner = chat.application.project.owner.id === userId;
       const otherUser = isOwner 
         ? chat.application.freelancer 
@@ -234,26 +213,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
         updatedAt: lastMessage?.createdAt || new Date(),
         status: chat.application.status,
       };
-    });    // Load messages for selected chat if specified
+    });
+
+    // Load messages for selected chat if specified
     let selectedChatMessages: any[] = [];
-    if (selectedApplicationId) {      const selectedChat = await prisma.chat.findUnique({
+    if (selectedApplicationId) {
+      const selectedChat = await prisma.chat.findUnique({
         where: { applicationId: selectedApplicationId },
         include: {
-          application: {
-            include: {
-              project: {
-                select: { 
-                  id: true, 
-                  title: true, 
-                  description: true,
-                  owner: { select: { id: true, name: true } }
-                }
-              },
-              freelancer: {
-                select: { id: true, name: true }
-              }
-            }
-          },
           messages: {
             include: {
               sender: {
@@ -263,24 +230,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
             orderBy: { createdAt: "asc" }
           }
         }
-      });      if (selectedChat) {
-        // Check if user has access to this chat
-        const isOwner = selectedChat.application.project.owner.id === userId;
-        const isFreelancer = selectedChat.application.freelancer.id === userId;
-        
-        // Freelancers can only access chats for APPROVED applications
-        if (isFreelancer && selectedChat.application.status !== 'APPROVED') {
-          // Redirect freelancer away from non-approved application chats
-          return redirect("/messages");
-        }
-        
-        // Owners can access all their chats regardless of status
-        if (!isOwner && !isFreelancer) {
-          // User has no access to this chat
-          return redirect("/messages");
-        }
+      });
 
-        const regularMessages = selectedChat.messages.map((msg: any) => ({
+      if (selectedChat) {
+        selectedChatMessages = selectedChat.messages.map((msg: any) => ({
           id: msg.id,
           content: msg.content,
           senderId: msg.senderId,
@@ -290,29 +243,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
           attachmentUrl: msg.attachmentUrl,
           attachmentName: msg.attachmentName,
           attachmentSize: msg.attachmentSize,
-          attachmentType: msg.attachmentType,
-          isApplicationMessage: false
-        }));        // Add application message as the first message for approved applications (permanent)
-        if (selectedChat.application.status === 'APPROVED') {const applicationMessage = {
-            id: `app-${selectedChat.applicationId}`,
-            content: `Hi! I'm interested in working on your project "${selectedChat.application.project.title}". I have the skills and experience needed for this work. Looking forward to hearing from you.`,
-            senderId: selectedChat.application.freelancer.id,
-            senderName: selectedChat.application.freelancer.name,
-            createdAt: selectedChat.createdAt,
-            isFromCurrentUser: selectedChat.application.freelancer.id === userId, // Show on freelancer's side
-            attachmentUrl: null,
-            attachmentName: null,
-            attachmentSize: null,
-            attachmentType: null,
-            isApplicationMessage: true,
-            projectId: selectedChat.application.project.id,
-            projectTitle: selectedChat.application.project.title
-          };
-          
-          selectedChatMessages = [applicationMessage, ...regularMessages];
-        } else {
-          selectedChatMessages = regularMessages;
-        }
+          attachmentType: msg.attachmentType
+        }));
       }
     }
 
@@ -443,12 +375,13 @@ export default function MessagesPage() {
   }, [fetcher.state, fetcher.data, selectedChatId, navigate]);
 
   const isSubmitting = fetcher.state === "submitting";
+
   return (
-    <div className="fixed inset-0 top-16 bg-gray-50 z-0 overflow-hidden">
+    <div className="fixed inset-0 bg-gray-50 z-0">
       <div className="w-full h-full flex">
-        {/* Chat List Sidebar - wider, fixed width, scrollable */}
-        <div className="w-96 min-w-[24rem] h-full border-r border-gray-200 flex flex-col bg-white shadow-sm">
-          <div className="p-6 border-b border-gray-200 bg-white">
+        {/* Chat List Sidebar - fixed width, scrollable */}
+        <div className="w-80 max-w-xs min-w-[18rem] h-full border-r border-gray-200 flex flex-col bg-gray-50">
+          <div className="p-4 border-b border-gray-200 bg-white">
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
@@ -468,16 +401,17 @@ export default function MessagesPage() {
               </div>
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto bg-gray-50">
+          <div className="flex-1 overflow-y-auto">
             {chats.length === 0 ? (
               <div className="p-8 text-center">
                 <div className="bg-blue-50 rounded-full p-6 w-20 h-20 mx-auto mb-4 flex items-center justify-center">
                   <svg className="w-8 h-8 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7z" clipRule="evenodd" />
                   </svg>
-                </div>                <h3 className="text-lg font-semibold text-gray-900 mb-2">No approved applications yet</h3>
-                <p className="text-gray-600 text-sm mb-6">
-                  You'll see chat conversations here once your job applications are approved by project owners.
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No messages yet</h3>
+                <p className="text-gray-500 text-sm mb-6">
+                  Connect with clients and freelancers by applying to projects or posting your own.
                 </p>
                 <div className="space-y-3">
                   <Link
@@ -495,35 +429,35 @@ export default function MessagesPage() {
                 </div>
               </div>
             ) : (
-              <div className="divide-y divide-gray-100">
+              <div>
                 {chats.map((chat) => (
                   <div
                     key={chat.id}
                     onClick={() => handleChatSelect(chat.applicationId)}
-                    className={`p-5 cursor-pointer hover:bg-white transition-all duration-200 border-l-4 ${
+                    className={`p-4 cursor-pointer hover:bg-white transition-colors border-l-4 ${
                       selectedChatId === chat.applicationId 
                         ? 'bg-white border-blue-500 shadow-sm' 
-                        : 'border-transparent hover:border-gray-200 bg-gray-50 hover:bg-white'
+                        : 'border-transparent hover:border-gray-200'
                     }`}
                   >
-                    <div className="flex items-start space-x-4">
-                      <div className="flex-shrink-0 relative">
-                        <div className="w-14 h-14 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-xl">
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0">
+                        <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-lg">
                           {chat.otherUser.name.charAt(0).toUpperCase()}
                         </div>
                         {chat.unreadCount > 0 && (
-                          <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-6 h-6 rounded-full flex items-center justify-center font-bold">
+                          <div className="absolute -mt-2 -ml-2 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
                             {chat.unreadCount}
                           </div>
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <h3 className="text-base font-bold text-gray-900 truncate">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-sm font-semibold text-gray-900 truncate">
                             {chat.otherUser.name}
                           </h3>
                           <div className="flex items-center space-x-2">
-                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                               chat.status === 'APPROVED' 
                                 ? 'bg-green-100 text-green-800' 
                                 : chat.status === 'PENDING'
@@ -534,14 +468,14 @@ export default function MessagesPage() {
                             </span>
                           </div>
                         </div>
-                        <p className="text-sm text-blue-600 font-medium mb-2 truncate">
+                        <p className="text-xs text-blue-600 font-medium mt-1 truncate">
                           {chat.projectTitle}
                         </p>
                         {chat.lastMessage && (
                           <div className="mt-2">
-                            <p className="text-sm text-gray-600 truncate leading-relaxed">
+                            <p className="text-sm text-gray-600 truncate">
                               {chat.lastMessage.isFromMe ? (
-                                <span className="text-gray-500 font-medium">You: </span>
+                                <span className="text-gray-500">You: </span>
                               ) : null}
                               {chat.lastMessage.content}
                             </p>
@@ -573,10 +507,11 @@ export default function MessagesPage() {
         </div>
         
         {/* Chat Content Area - fills the rest, no page scroll */}
-        <div className="flex-1 flex flex-col h-full bg-white overflow-hidden">
+        <div className="flex-1 flex flex-col h-full bg-white">
           {selectedChat ? (
-            <>              {/* Chat Header - More compact and cleaner */}
-              <div className="flex-shrink-0 p-5 border-b border-gray-200 bg-white" style={{ height: '104.67px' }}>
+            <>
+              {/* Chat Header - Compact */}
+              <div className="p-4 border-b border-gray-200 bg-white">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
                     <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-lg">
@@ -586,7 +521,7 @@ export default function MessagesPage() {
                       <h2 className="text-lg font-bold text-gray-900">
                         {selectedChat.otherUser.name}
                       </h2>
-                      <p className="text-sm text-gray-600 font-medium">
+                      <p className="text-sm text-gray-600">
                         {selectedChat.projectTitle}
                       </p>
                       <div className="flex items-center mt-1">
@@ -596,7 +531,7 @@ export default function MessagesPage() {
                     </div>
                   </div>
                   <div className="flex items-center space-x-3">
-                    <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
                       selectedChat.status === 'APPROVED' 
                         ? 'bg-green-100 text-green-800' 
                         : selectedChat.status === 'PENDING'
@@ -618,8 +553,8 @@ export default function MessagesPage() {
                 </div>
               </div>
               
-              {/* Messages Area - Larger and better proportioned */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50" style={{ scrollBehavior: 'smooth' }}>
+              {/* Messages Area - Much larger for better chat viewing */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-4 min-h-0" style={{ scrollBehavior: 'smooth', minHeight: 'calc(100vh - 400px)' }}>
                 {selectedChatMessages.length === 0 ? (
                   <div className="flex items-center justify-center h-full min-h-[300px]">
                     <div className="text-center">
@@ -635,35 +570,19 @@ export default function MessagesPage() {
                     </div>
                   </div>
                 ) : (
-                  <>                    {selectedChatMessages.map((message: any) => (
+                  <>
+                    {selectedChatMessages.map((message: any) => (
                       <div
                         key={message.id}
                         className={`flex ${message.isFromCurrentUser ? 'justify-end' : 'justify-start'}`}
                         onClick={(e) => e.stopPropagation()} // Prevent any click propagation
-                      >                        <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-xl shadow-sm ${
-                          message.isApplicationMessage
-                            ? 'bg-white text-gray-900 border border-gray-200'
-                            : message.isFromCurrentUser
-                            ? 'bg-green-50 text-gray-900 border border-green-200'
-                            : 'bg-white text-gray-900 border border-gray-200'
+                      >
+                        <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                          message.isFromCurrentUser
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-900'
                         }`}>
-                          {message.content && <p className="text-sm leading-relaxed">{message.content}</p>}
-                          
-                          {/* Show project link for application messages */}
-                          {message.isApplicationMessage && message.projectTitle && (
-                            <div className="mt-3 pt-3 border-t border-green-200">
-                              <Link
-                                to={`/projects/${message.projectId}`}
-                                className="inline-flex items-center text-sm font-medium text-green-700 hover:text-green-800 bg-green-100 hover:bg-green-200 px-3 py-2 rounded-lg transition-colors"
-                              >
-                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                </svg>
-                                View details
-                              </Link>
-                            </div>
-                          )}
-                          
+                          {message.content && <p className="text-sm">{message.content}</p>}
                           {/* Display attachment if present */}
                           {message.attachmentUrl && (
                             <div className="mt-2">
@@ -674,8 +593,9 @@ export default function MessagesPage() {
                                   className="max-w-full h-auto rounded-md cursor-pointer"
                                   onClick={() => window.open(message.attachmentUrl, '_blank')}
                                 />
-                              ) : (                                <div className={`flex items-center space-x-2 p-2 rounded-md ${
-                                  message.isFromCurrentUser ? 'bg-green-100' : 'bg-gray-100'
+                              ) : (
+                                <div className={`flex items-center space-x-2 p-2 rounded-md ${
+                                  message.isFromCurrentUser ? 'bg-blue-500' : 'bg-gray-200'
                                 }`}>
                                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -684,22 +604,22 @@ export default function MessagesPage() {
                                     href={message.attachmentUrl} 
                                     download={message.attachmentName}
                                     className={`text-sm underline ${
-                                      message.isFromCurrentUser ? 'text-green-700' : 'text-blue-600'
+                                      message.isFromCurrentUser ? 'text-blue-100' : 'text-blue-600'
                                     }`}
                                   >
                                     {message.attachmentName}
-                                  </a>                                  <span className={`text-xs ${
-                                    message.isFromCurrentUser ? 'text-green-600' : 'text-gray-500'
+                                  </a>
+                                  <span className={`text-xs ${
+                                    message.isFromCurrentUser ? 'text-blue-200' : 'text-gray-500'
                                   }`}>
                                     ({Math.round((message.attachmentSize || 0) / 1024)} KB)
                                   </span>
                                 </div>
                               )}
                             </div>
-                          )}                          <p className={`text-xs mt-1 ${
-                            message.isApplicationMessage 
-                              ? 'text-gray-500'
-                              : message.isFromCurrentUser ? 'text-green-600' : 'text-gray-500'
+                          )}
+                          <p className={`text-xs mt-1 ${
+                            message.isFromCurrentUser ? 'text-blue-200' : 'text-gray-500'
                           }`}>
                             {new Date(message.createdAt).toLocaleTimeString([], { 
                               hour: '2-digit', 
@@ -714,57 +634,57 @@ export default function MessagesPage() {
                 )}
               </div>
               
-              {/* Message Input - Better positioned and styled */}
-              <div className="flex-shrink-0 border-t border-gray-200 bg-white">
-                <div className="p-6">
-                  {/* File Preview */}
-                  {selectedFile && (
-                    <div className="mb-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">{selectedFile.name}</p>
-                            <p className="text-xs text-gray-500">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                          </div>
+              {/* Message Input - Normal size, positioned at bottom */}
+              <div className="flex-shrink-0 p-8 border-t border-gray-200 bg-white">
+                {/* File Preview */}
+                {selectedFile && (
+                  <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{selectedFile.name}</p>
+                          <p className="text-xs text-gray-500">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
                         </div>
-                        <button
-                          type="button"
-                          onClick={handleRemoveFile}
-                          className="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
                       </div>
+                      <button
+                        type="button"
+                        onClick={handleRemoveFile}
+                        className="text-gray-400 hover:text-gray-600 p-1"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
                     </div>
-                  )}
+                  </div>
+                )}
+                
+                <form onSubmit={handleSendMessage} className="space-y-3">
+                  {/* Hidden file input */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    accept="image/*,.pdf,.doc,.docx,.txt"
+                    multiple={false}
+                  />
                   
-                  <form onSubmit={handleSendMessage} className="space-y-4">
-                    {/* Hidden file input */}
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      onChange={handleFileSelect}
-                      className="hidden"
-                      accept="image/*,.pdf,.doc,.docx,.txt"
-                      multiple={false}
-                    />
-                      {/* Message input field - Buttons below */}
-                    <div className="w-full space-y-3">
-                      {/* Text area */}
-                      <div className="w-full">
+                  {/* Message input field - Normal size with buttons inline */}
+                  <div className="w-full">
+                    <div className="flex items-end space-x-4">
+                      <div className="flex-1">
                         <textarea
                           value={newMessage}
                           onChange={(e) => setNewMessage(e.target.value)}
                           placeholder={`Message ${selectedChat.otherUser.name}...`}
-                          className="w-full px-6 py-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-all duration-200 text-base shadow-sm"
+                          className="w-full px-6 py-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-all duration-200 text-base"
                           disabled={isSubmitting}
-                          rows={3}
-                          style={{ minHeight: '100px' }}
+                          rows={4}
+                          style={{ minHeight: '120px' }}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && !e.shiftKey) {
                               e.preventDefault();
@@ -774,43 +694,39 @@ export default function MessagesPage() {
                         />
                       </div>
                       
-                      {/* Buttons below the text area */}
-                      <div className="flex items-center justify-between">
-                        {/* Attach button */}
-                        <button
-                          type="button"
-                          onClick={handleAttachClick}
-                          className="px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors flex items-center space-x-2 border border-gray-300 bg-white"
-                          title="Attach file"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                      {/* Attach button */}
+                      <button
+                        type="button"
+                        onClick={handleAttachClick}
+                        className="p-4 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors flex items-center justify-center"
+                        title="Attach file"
+                      >
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                        </svg>
+                      </button>
+                      
+                      {/* Send button */}
+                      <button
+                        type="submit"
+                        disabled={(!newMessage.trim() && !selectedFile) || isSubmitting}
+                        className="px-8 py-4 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-3 transition-colors text-base font-medium"
+                      >
+                        {isSubmitting ? (
+                          <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"></circle>
+                            <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" className="opacity-75"></path>
                           </svg>
-                          <span className="text-sm font-medium">Attach</span>
-                        </button>
-                        
-                        {/* Send button */}
-                        <button
-                          type="submit"
-                          disabled={(!newMessage.trim() && !selectedFile) || isSubmitting}
-                          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 transition-colors text-sm font-medium shadow-md hover:shadow-lg"
-                        >
-                          {isSubmitting ? (
-                            <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"></circle>
-                              <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" className="opacity-75"></path>
-                            </svg>
-                          ) : (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                            </svg>
-                          )}
-                          <span>Send</span>
-                        </button>
-                      </div>
+                        ) : (
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                          </svg>
+                        )}
+                        <span>Send</span>
+                      </button>
                     </div>
-                  </form>
-                </div>
+                  </div>
+                </form>
               </div>
             </>
           ) : (
