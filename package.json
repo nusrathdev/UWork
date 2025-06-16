@@ -16,7 +16,6 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@prisma/client": "^6.9.0",
     "@remix-run/node": "^2.16.8",
     "@remix-run/react": "^2.16.8",
     "@remix-run/serve": "^2.16.8",
@@ -27,6 +26,7 @@
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@prisma/client": "^6.9.0",
     "@remix-run/dev": "^2.16.8",
     "@types/bcryptjs": "^2.4.6",
     "@types/react": "^18.2.20",

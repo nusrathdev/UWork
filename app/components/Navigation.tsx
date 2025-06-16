@@ -420,6 +420,28 @@ export default function Navigation({ user, unreadNotificationCount = 0, recentNo
                           Dashboard
                         </div>
                       </Link>
+                      <Link
+                        to="/payments"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center">
+                          <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                          </svg>
+                          💳 Payments & Escrow
+                        </div>
+                      </Link>
+                      <Link
+                        to="/wallet"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center">
+                          <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                          </svg>
+                          My Wallet
+                        </div>
+                      </Link>
                       <div className="border-t border-gray-100 mt-2 pt-2">
                         <Form method="post" action="/auth/clear-session">
                           <button

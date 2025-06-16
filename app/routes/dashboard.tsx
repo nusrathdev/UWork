@@ -357,17 +357,42 @@ export default function Dashboard() {
             <h2 className="text-xl font-semibold mb-4">Your Projects</h2>
             {projects.length === 0 ? (
               <p className="text-gray-600">You haven't posted any projects yet.</p>
-            ) : (              <div className="space-y-4">
-                {projects.map((project: any) => (
+            ) : (              <div className="space-y-4">                {projects.map((project: any) => (
                   <div key={project.id} className="border border-gray-200 rounded-md p-4">
                     <div className="flex justify-between items-start">
                       <div>
                         <h3 className="font-medium">{project.title}</h3>
-                        <p className="text-gray-600 text-sm">{project.description.slice(0, 100)}...</p>                        <p className="text-sm mt-1">
+                        <p className="text-gray-600 text-sm">{project.description.slice(0, 100)}...</p>
+                        <p className="text-sm mt-1">
                           <span className="font-medium">Budget:</span> ${project.budget} | 
                           <span className="font-medium"> Applications:</span> {project.applications?.length || 0} |
                           <span className="font-medium"> Status:</span> {project.status || 'OPEN'}
                         </p>
+                        
+                        {/* Show approved applications that need payment */}
+                        {project.applications?.filter((app: any) => app.status === 'APPROVED').length > 0 && (
+                          <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded">
+                            <p className="text-sm text-green-800 font-medium">
+                              ✅ Approved Applications ({project.applications.filter((app: any) => app.status === 'APPROVED').length})
+                            </p>
+                            {project.applications
+                              .filter((app: any) => app.status === 'APPROVED')
+                              .map((app: any) => (
+                                <div key={app.id} className="mt-1 flex items-center justify-between">
+                                  <span className="text-sm text-green-700">
+                                    {app.freelancer.name} - ${app.proposedBudget}
+                                  </span>
+                                  <Link
+                                    to={`/payment/${app.id}`}
+                                    className="inline-flex items-center px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 transition-colors"
+                                  >
+                                    💳 Make Payment
+                                  </Link>
+                                </div>
+                              ))
+                            }
+                          </div>
+                        )}
                       </div>
                       <Link
                         to={`/projects/${project.id}`}
