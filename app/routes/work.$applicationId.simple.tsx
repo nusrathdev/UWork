@@ -230,7 +230,7 @@ export default function WorkPage() {
                       Stay in touch with your freelancer throughout the project.
                     </p>
                     <Link
-                      to={`/messages/${application.id}`}
+                      to={`/chat/${application.id}`}
                       className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                     >
                       <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
@@ -269,7 +269,7 @@ export default function WorkPage() {
                       Communicate with your client about project details.
                     </p>
                     <Link
-                      to={`/messages/${application.id}`}
+                      to={`/chat/${application.id}`}
                       className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                     >
                       <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">

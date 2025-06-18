@@ -299,7 +299,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
             senderId: selectedChat.application.freelancer.id,
             senderName: selectedChat.application.freelancer.name,
             createdAt: selectedChat.createdAt,
-            isFromCurrentUser: selectedChat.application.freelancer.id === userId, // Show on freelancer's side
+            isFromCurrentUser: selectedChat.application.freelancer.id === userId, // True when freelancer views (green/right), false when owner views (white/left)
             attachmentUrl: null,
             attachmentName: null,
             attachmentSize: null,
@@ -642,7 +642,9 @@ export default function MessagesPage() {
                         onClick={(e) => e.stopPropagation()} // Prevent any click propagation
                       >                        <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-xl shadow-sm ${
                           message.isApplicationMessage
-                            ? 'bg-white text-gray-900 border border-gray-200'
+                            ? message.isFromCurrentUser
+                              ? 'bg-green-50 text-gray-900 border border-green-200'
+                              : 'bg-white text-gray-900 border border-gray-200'
                             : message.isFromCurrentUser
                             ? 'bg-green-50 text-gray-900 border border-green-200'
                             : 'bg-white text-gray-900 border border-gray-200'

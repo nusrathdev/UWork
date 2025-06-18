@@ -223,14 +223,12 @@ export default function WorkPage() {
                       Make Payment
                     </Link>
                   </div>
-                  
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="font-medium text-blue-900 mb-2">💬 Communication</h4>
-                    <p className="text-sm text-blue-800 mb-3">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 className="font-medium text-blue-900 mb-2">💬 Communication</h4>                    <p className="text-sm text-blue-800 mb-3">
                       Stay in touch with your freelancer throughout the project.
                     </p>
                     <Link
-                      to={`/messages/${application.id}`}
+                      to={`/messages?chat=${application.id}`}
                       className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                     >
                       <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
@@ -266,10 +264,9 @@ export default function WorkPage() {
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <h4 className="font-medium text-blue-900 mb-2">💬 Stay Connected</h4>
                     <p className="text-sm text-blue-800 mb-3">
-                      Communicate with your client about project details.
-                    </p>
+                      Communicate with your client about project details.                    </p>
                     <Link
-                      to={`/messages/${application.id}`}
+                      to={`/messages?chat=${application.id}`}
                       className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                     >
                       <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
