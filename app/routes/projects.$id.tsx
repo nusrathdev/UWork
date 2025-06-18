@@ -346,18 +346,34 @@ export default function ProjectDetail() {
           )}
 
           {/* Application Form or Status */}
-          {user ? (
-            isOwner ? (
+          {user ? (            isOwner ? (
               <div className="bg-blue-50 border border-blue-200 rounded-md p-6">
                 <h3 className="text-lg font-semibold text-blue-900 mb-2">This is your project</h3>
                 <p className="text-blue-700 mb-4">You can manage applications and project status.</p>
-                <Link
-                  to={`/dashboard/projects/${project.id}/manage`}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  Manage Project
-                </Link>
-              </div>            ) : hasApplied ? (
+                <div className="flex space-x-3">
+                  <Link
+                    to={`/dashboard/projects/${project.id}/manage`}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    Manage Project
+                  </Link>
+                  {/* Cancel Project Button */}
+                  {project.status !== 'CANCELLED' && project.status !== 'COMPLETED' && (
+                    (() => {                    const approvedApplications = project.applications.filter(app => 
+                      app.status === 'APPROVED' || app.status === 'COMPLETED'
+                    );
+                      return approvedApplications.length === 0 ? (
+                        <Link
+                          to={`/projects/cancel/${project.id}`}
+                          className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors"
+                        >
+                          Cancel Project
+                        </Link>
+                      ) : null;
+                    })()
+                  )}
+                </div>
+              </div>) : hasApplied ? (
               <div className={`border rounded-md p-6 ${
                 userApplication?.status === 'APPROVED' ? 'bg-green-50 border-green-200' :
                 userApplication?.status === 'REJECTED' ? 'bg-red-50 border-red-200' :
@@ -376,9 +392,8 @@ export default function ProjectDetail() {
                     <p className="text-green-700 mb-4">
                       🎉 Congratulations! Your application has been approved. You can now start chatting with the project owner.
                     </p>
-                    <div className="flex space-x-3">
-                      <Link
-                        to={`/messages/${userApplication.id}`}
+                    <div className="flex space-x-3">                      <Link
+                        to={`/messages?chat=${userApplication.id}`}
                         className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
                       >
                         <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
@@ -480,54 +495,111 @@ export default function ProjectDetail() {
                 Login
               </Link>
             </div>
-          )}
-
-          {/* Applications (for project owner) */}
+          )}          {/* Applications (for project owner) */}
           {isOwner && project.applications.length > 0 && (
             <div className="mt-8 border-t border-gray-200 pt-8">
               <h2 className="text-xl font-semibold text-gray-900 mb-6">Applications ({project.applications.length})</h2>
-              <div className="space-y-4">                {project.applications.map((application) => (
-                  <div key={application.id} className="border border-gray-200 rounded-md p-4">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <h4 className="font-medium text-gray-900">{application.freelancer.name}</h4>
-                        <p className="text-sm text-gray-600">{application.freelancer.email}</p>
-                        <p className="text-sm text-gray-500">
-                          ★ {application.freelancer.rating?.toFixed(1) || '0.0'} rating
-                        </p>
-                        <p className="text-sm font-medium text-green-600 mt-1">
-                          Proposed Budget: ${application.proposedBudget}
-                        </p>
-                        <p className="text-gray-700 mt-2">{application.coverMessage}</p>
+              <div className="space-y-6">
+                {project.applications.map((application) => (
+                  <div key={application.id} className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow p-6">
+                    {/* Header with freelancer info and status */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center space-x-4">
+                        <div className="flex-shrink-0">
+                          <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                            <span className="text-blue-600 font-semibold text-lg">
+                              {application.freelancer.name.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                        </div>
+                        <div>
+                          <h4 className="text-lg font-semibold text-gray-900">{application.freelancer.name}</h4>
+                          <p className="text-sm text-gray-600">{application.freelancer.email}</p>
+                          <div className="flex items-center space-x-4 mt-1">
+                            <div className="flex items-center">
+                              <svg className="w-4 h-4 text-yellow-400 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                              </svg>
+                              <span className="text-sm text-gray-600">{application.freelancer.rating?.toFixed(1) || '0.0'}</span>
+                            </div>
+                            <div className="text-sm font-semibold text-green-600">
+                              Budget: LKR {application.proposedBudget.toLocaleString()}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="ml-4 flex flex-col items-end space-y-2">
-                        <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                      
+                      <div className="flex flex-col items-end space-y-2">
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
                           application.status === 'APPROVED' ? 'bg-green-100 text-green-800' :
                           application.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
                           'bg-yellow-100 text-yellow-800'
                         }`}>
                           {application.status}
-                        </span>                        <p className="text-xs text-gray-500">
+                        </span>
+                        <p className="text-xs text-gray-500 text-right">
                           Applied: {new Date(application.createdAt).toLocaleDateString()}
                           {application.updatedAt && application.updatedAt !== application.createdAt && (
                             <span className="block">
-                              Updated: {new Date(application.updatedAt).toLocaleDateString()} at {new Date(application.updatedAt).toLocaleTimeString()}
+                              Updated: {new Date(application.updatedAt).toLocaleDateString()}
                             </span>
                           )}
                         </p>
-                        
+                      </div>
+                    </div>
+
+                    {/* Cover message with read more functionality */}
+                    <div className="mb-4">
+                      <h5 className="text-sm font-medium text-gray-900 mb-2">Cover Message:</h5>
+                      <div className="bg-gray-50 rounded-md p-3">
+                        {application.coverMessage.length > 200 ? (
+                          <div>
+                            <p className="text-gray-700 text-sm leading-relaxed" id={`message-${application.id}`}>
+                              {application.coverMessage.substring(0, 200)}...
+                            </p>
+                            <button
+                              onClick={() => {
+                                const element = document.getElementById(`message-${application.id}`);
+                                const button = element?.nextElementSibling as HTMLButtonElement;
+                                if (element && button) {
+                                  if (element.textContent?.includes('...')) {
+                                    element.textContent = application.coverMessage;
+                                    button.textContent = 'Read Less';
+                                  } else {
+                                    element.textContent = application.coverMessage.substring(0, 200) + '...';
+                                    button.textContent = 'Read More';
+                                  }
+                                }
+                              }}
+                              className="text-blue-600 hover:text-blue-700 text-sm font-medium mt-2"
+                            >
+                              Read More
+                            </button>
+                          </div>
+                        ) : (
+                          <p className="text-gray-700 text-sm leading-relaxed">{application.coverMessage}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                      <div className="flex space-x-3">
                         {/* Action buttons for pending applications */}
                         {application.status === 'PENDING' && (
-                          <div className="flex space-x-2 mt-2">
+                          <>
                             <Form method="post" className="inline">
                               <input type="hidden" name="intent" value="approve" />
                               <input type="hidden" name="applicationId" value={application.id} />
                               <button
                                 type="submit"
                                 disabled={isSubmitting}
-                                className="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700 disabled:opacity-50"
+                                className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 transition-colors"
                               >
-                                Accept
+                                <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                                Accept Application
                               </button>
                             </Form>
                             <Form method="post" className="inline">
@@ -536,31 +608,52 @@ export default function ProjectDetail() {
                               <button
                                 type="submit"
                                 disabled={isSubmitting}
-                                className="bg-red-600 text-white px-3 py-1 rounded text-xs hover:bg-red-700 disabled:opacity-50"
+                                className="inline-flex items-center px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 transition-colors"
                               >
-                                Reject
+                                <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                </svg>
+                                Reject Application
                               </button>
                             </Form>
-                          </div>
-                        )}                        {/* Chat button for approved applications */}
+                          </>
+                        )}
+
+                        {/* Buttons for approved applications */}
                         {application.status === 'APPROVED' && (
-                          <Link
-                            to={`/messages/${application.id}`}
-                            className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-xs"
-                          >
-                            <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
-                            </svg>
-                            Chat
-                          </Link>
+                          <>                            <Link
+                              to={`/messages?chat=${application.id}`}
+                              className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
+                            >
+                              <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
+                              </svg>
+                              Start Chat
+                            </Link>
+                            {user?.id === project.ownerId && (
+                              <Link
+                                to={`/payment/${application.id}`}
+                                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                              >
+                                <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                  <path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zM14 6a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2h8zM6 8a2 2 0 000 4h8a2 2 0 000-4H6z"/>
+                                </svg>
+                                Make Payment
+                              </Link>
+                            )}
+                          </>
                         )}
                       </div>
+
+                      {application.status === 'REJECTED' && (
+                        <span className="text-sm text-gray-500">Application was rejected</span>
+                      )}
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-          )}          {/* Back to Projects */}          <div className="mt-8 pt-6 border-t border-gray-200">
+          )}{/* Back to Projects */}          <div className="mt-8 pt-6 border-t border-gray-200">
             <Link
               to="/projects"
               className="text-blue-600 hover:text-blue-700 font-medium"

@@ -22,7 +22,6 @@ enum ApplicationStatus {
   PENDING
   APPROVED
   REJECTED
-  PAID
   COMPLETED
 }
 

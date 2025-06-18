@@ -97,8 +97,13 @@ export async function createUser(email: string, password: string, userData: any)
     data: {
       email,
       password: hashedPassword,
-      ...userData,
-      skills: JSON.stringify(userData.skills || []),
+      name: userData.name,
+      studentId: userData.studentId,
+      university: userData.university,
+      course: userData.course || '',
+      year: userData.year || 1,
+      bio: userData.bio || '',
+      skills: Array.isArray(userData.skills) ? userData.skills.join(',') : (userData.skills || ''),
     },
   });
 }
