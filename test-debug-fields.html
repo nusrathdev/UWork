@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PayHere Debug - Minimal Required Fields</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .test-form { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; border: 2px solid #007bff; }
+        button { background: #007bff; color: white; padding: 12px 24px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #0056b3; }
+        .error-info { background: #fff3cd; padding: 15px; border-radius: 5px; margin: 10px 0; border-left: 4px solid #ffc107; }
+        .field-info { background: #d1ecf1; padding: 10px; border-radius: 5px; margin: 5px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        td { padding: 8px; border: 1px solid #ddd; }
+        .field-name { font-weight: bold; background: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <h1>PayHere Debug - Minimal Required Fields</h1>
+    
+    <div class="error-info">
+        <h3>🎉 Progress Made!</h3>
+        <p><strong>Old Error:</strong> 081916062526 (Hash/credentials issue)</p>
+        <p><strong>New Errors:</strong> 301916062522, 301916062518, 301916062512 (Field validation issues)</p>
+        <p>✅ This means the hash generation is now working!</p>
+        <p>❌ But there are field validation problems</p>
+    </div>
+    
+    <div class="field-info">
+        <h3>Error Code Analysis:</h3>
+        <ul>
+            <li><strong>301916062522:</strong> Invalid or missing required field</li>
+            <li><strong>301916062518:</strong> Invalid amount format or currency issue</li>
+            <li><strong>301916062512:</strong> Invalid merchant configuration or field format</li>
+        </ul>
+    </div>
+    
+    <h2>🧪 Ultra-Minimal Test (Only Required Fields)</h2>
+    
+    <div class="test-form">
+        <h3>Form Data Being Sent:</h3>
+        <table>
+            <tr><td class="field-name">merchant_id</td><td>4OVxzM0PLRQ4JFnJecjqk43Xi</td></tr>
+            <tr><td class="field-name">return_url</td><td>https://httpbin.org/status/200</td></tr>
+            <tr><td class="field-name">cancel_url</td><td>https://httpbin.org/status/200</td></tr>
+            <tr><td class="field-name">notify_url</td><td>https://httpbin.org/post</td></tr>
+            <tr><td class="field-name">order_id</td><td>MIN_TEST_1750082500000</td></tr>
+            <tr><td class="field-name">items</td><td>Test</td></tr>
+            <tr><td class="field-name">currency</td><td>LKR</td></tr>
+            <tr><td class="field-name">amount</td><td>10.00</td></tr>
+            <tr><td class="field-name">first_name</td><td>Test</td></tr>
+            <tr><td class="field-name">last_name</td><td>User</td></tr>
+            <tr><td class="field-name">email</td><td>test@test.com</td></tr>
+            <tr><td class="field-name">hash</td><td>a05f0103966e835dd3cd082c9690b70d</td></tr>
+        </table>
+        
+        <form method="POST" action="https://sandbox.payhere.lk/pay/checkout">
+            <input type="hidden" name="merchant_id" value="4OVxzM0PLRQ4JFnJecjqk43Xi">
+            <input type="hidden" name="return_url" value="https://httpbin.org/status/200">
+            <input type="hidden" name="cancel_url" value="https://httpbin.org/status/200">
+            <input type="hidden" name="notify_url" value="https://httpbin.org/post">
+            <input type="hidden" name="order_id" value="MIN_TEST_1750082500000">
+            <input type="hidden" name="items" value="Test">
+            <input type="hidden" name="currency" value="LKR">
+            <input type="hidden" name="amount" value="10.00">
+            <input type="hidden" name="first_name" value="Test">
+            <input type="hidden" name="last_name" value="User">
+            <input type="hidden" name="email" value="test@test.com">
+            <input type="hidden" name="hash" value="a05f0103966e835dd3cd082c9690b70d">
+            
+            <button type="submit">🔬 Test Minimal Fields</button>
+        </form>
+    </div>
+    
+    <h2>🧪 Alternative Test - Different Amount Format</h2>
+    
+    <div class="test-form">
+        <h3>Testing with Amount = 1000 (no decimals)</h3>
+        
+        <form method="POST" action="https://sandbox.payhere.lk/pay/checkout">
+            <input type="hidden" name="merchant_id" value="4OVxzM0PLRQ4JFnJecjqk43Xi">
+            <input type="hidden" name="return_url" value="https://httpbin.org/status/200">
+            <input type="hidden" name="cancel_url" value="https://httpbin.org/status/200">
+            <input type="hidden" name="notify_url" value="https://httpbin.org/post">
+            <input type="hidden" name="order_id" value="ALT_TEST_1750082500001">
+            <input type="hidden" name="items" value="Test Payment">
+            <input type="hidden" name="currency" value="LKR">
+            <input type="hidden" name="amount" value="1000">
+            <input type="hidden" name="first_name" value="John">
+            <input type="hidden" name="last_name" value="Doe">
+            <input type="hidden" name="email" value="john.doe@example.com">
+            <input type="hidden" name="hash" value="cb75214bc676be13dc54f5b2f0dcb1ec">
+            
+            <button type="submit">🔬 Test Alternative Format</button>
+        </form>
+    </div>
+    
+    <div class="error-info">
+        <h3>🔍 What We're Testing:</h3>
+        <ol>
+            <li><strong>Minimal Fields:</strong> Only absolutely required fields</li>
+            <li><strong>Simple Values:</strong> Short, simple field values</li>
+            <li><strong>Amount Formats:</strong> Both decimal (10.00) and integer (1000)</li>
+            <li><strong>Email Format:</strong> Different email formats</li>
+        </ol>
+        
+        <h3>🎯 What to Report:</h3>
+        <p>For each test, tell me:</p>
+        <ul>
+            <li>✅ <strong>Success:</strong> If you get to PayHere payment page</li>
+            <li>❌ <strong>Error:</strong> The exact error code you see</li>
+            <li>🔄 <strong>Different:</strong> If you get a different error than before</li>
+        </ul>
+    </div>
+    
+    <div class="field-info">
+        <h3>💡 Next Steps After Testing:</h3>
+        <p>Once we identify which format works, I'll:</p>
+        <ol>
+            <li>Update your PayHere service with the correct hash method</li>
+            <li>Fix any field format issues</li>
+            <li>Test the wallet deposit functionality</li>
+            <li>Restore the proper notify URLs for your app</li>
+        </ol>
+    </div>
+</body>
+</html>

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PayHere Test Form</title>
+</head>
+<body>
+    <h2>PayHere Test Payment</h2>
+    <form method="POST" action="https://sandbox.payhere.lk/pay/checkout">
+        <input type="hidden" name="merchant_id" value="4OVxzM0PLRQ4JFnJecjqk43Xi">
+        <input type="hidden" name="return_url" value="https://httpbin.org/status/200">
+        <input type="hidden" name="cancel_url" value="https://httpbin.org/status/200">
+        <input type="hidden" name="notify_url" value="https://httpbin.org/post">
+        <input type="hidden" name="order_id" value="TEST_ORDER_1750081671446">
+        <input type="hidden" name="items" value="Test Item">
+        <input type="hidden" name="currency" value="LKR">
+        <input type="hidden" name="amount" value="100.00">
+        <input type="hidden" name="first_name" value="John">
+        <input type="hidden" name="last_name" value="Doe">
+        <input type="hidden" name="email" value="john@example.com">
+        <input type="hidden" name="phone" value="0771234567">
+        <input type="hidden" name="address" value="Colombo">
+        <input type="hidden" name="city" value="Colombo">
+        <input type="hidden" name="country" value="Sri Lanka">
+        <input type="hidden" name="hash" value="F583CEA07929473FD97108A92F71DC0B">
+        <button type="submit" style="background: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">Pay with PayHere</button>
+    </form>
+    
+    <h3>Form Data:</h3>
+    <pre>{
+  "merchant_id": "4OVxzM0PLRQ4JFnJecjqk43Xi",
+  "return_url": "https://httpbin.org/status/200",
+  "cancel_url": "https://httpbin.org/status/200",
+  "notify_url": "https://httpbin.org/post",
+  "order_id": "TEST_ORDER_1750081671446",
+  "items": "Test Item",
+  "currency": "LKR",
+  "amount": "100.00",
+  "first_name": "John",
+  "last_name": "Doe",
+  "email": "john@example.com",
+  "phone": "0771234567",
+  "address": "Colombo",
+  "city": "Colombo",
+  "country": "Sri Lanka",
+  "hash": "F583CEA07929473FD97108A92F71DC0B"
+}</pre>
+
+    <h3>Instructions:</h3>
+    <ol>
+        <li>Open this file in a web browser</li>
+        <li>Click "Pay with PayHere" button</li>
+        <li>If you get the same error (081916062526), the issue is likely with the merchant credentials</li>
+        <li>If it works, the issue is with the notify URL accessibility in your app</li>
+    </ol>
+    
+    <h3>Error Code 081916062526 - Possible Solutions:</h3>
+    <ul>
+        <li><strong>Merchant Credentials:</strong> Verify your PayHere sandbox merchant ID and secret</li>
+        <li><strong>Hash Generation:</strong> Double-check hash calculation formula</li>
+        <li><strong>URL Accessibility:</strong> Ensure notify_url is publicly accessible</li>
+        <li><strong>Field Validation:</strong> Check for any invalid characters in form fields</li>
+        <li><strong>Account Status:</strong> Verify your PayHere sandbox account is active</li>
+    </ul>
+</body>
+</html>

@@ -30,22 +30,25 @@ export class PayHereService {
   constructor(config: PayHereConfig) {
     this.config = config;
   }
-
   /**
-   * Generate PayHere payment hash
+   * Generate PayHere payment hash (Official PayHere Documentation Method)
    */
   generateHash(paymentData: PaymentData): string {
     const { merchantId, merchantSecret } = this.config;
     const { orderId, amount, currency } = paymentData;
     
-    // PayHere hash format: merchant_id + order_id + amount + currency + md5(merchant_secret)
+    // Official PayHere hash format from documentation:
+    // hash = to_upper_case(md5(merchant_id + order_id + amount + currency + to_upper_case(md5(merchant_secret))))
     const merchantSecretHash = crypto
       .createHash('md5')
       .update(merchantSecret)
       .digest('hex')
       .toUpperCase();
     
-    const hashString = `${merchantId}${orderId}${amount.toFixed(2)}${currency}${merchantSecretHash}`;
+    // Format amount exactly as PayHere documentation: number_format($amount, 2, '.', '')
+    const formattedAmount = amount.toFixed(2);
+    
+    const hashString = `${merchantId}${orderId}${formattedAmount}${currency}${merchantSecretHash}`;
     
     return crypto
       .createHash('md5')
@@ -53,9 +56,8 @@ export class PayHereService {
       .digest('hex')
       .toUpperCase();
   }
-
   /**
-   * Verify PayHere notification hash
+   * Verify PayHere notification hash (Official PayHere Documentation Method)
    */
   verifyNotificationHash(
     merchantId: string,
@@ -66,6 +68,8 @@ export class PayHereService {
     statusCode: string,
     hash: string
   ): boolean {
+    // Official PayHere notification verification from documentation:
+    // md5sig = strtoupper(md5(merchant_id + order_id + payhere_amount + payhere_currency + status_code + strtoupper(md5(merchant_secret))))
     const merchantSecretHash = crypto
       .createHash('md5')
       .update(this.config.merchantSecret)
