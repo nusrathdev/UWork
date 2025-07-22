@@ -7,9 +7,11 @@ import { prisma } from "~/utils/db.server";
 export async function loader({ request }: LoaderFunctionArgs) {
   const session = await getUserSession(request);
   const userId = session.get("userId");
+  const url = new URL(request.url);
 
-  // If user is logged in, redirect to Find Work page
-  if (userId && typeof userId === "string") {
+  // Only redirect to projects if user is on the exact home page ("/")
+  // Don't redirect if they're navigating to other routes like /profile/edit
+  if (userId && typeof userId === "string" && url.pathname === "/") {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { id: true }

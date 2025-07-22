@@ -1,1 +1,31 @@
-/* If you are not using a build step, replace the @tailwind directives with the compiled Tailwind CSS output. Otherwise, make sure your build tool (like PostCSS with Tailwind plugin) is set up to process this file. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom utilities */
+@layer utilities {
+  .line-clamp-2 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  
+  .line-clamp-3 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+}
+
+/* Custom gradient backgrounds */
+@layer components {
+  .gradient-bg {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+  
+  .profile-avatar {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+}
